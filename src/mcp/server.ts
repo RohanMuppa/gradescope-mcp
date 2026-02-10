@@ -4,28 +4,25 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerClearCacheTool } from "./tools/clear-cache.js";
+import { TTLCache } from "../utils/cache.js";
+
+// Shared cache instance used across all server tools
+const cache = new TTLCache();
 
 /**
  * Create and configure the MCP server instance.
  * Registers all available tools.
  *
- * @returns Configured MCP server instance
+ * @returns Object containing configured MCP server and cache instance
  */
-export function createServer(): McpServer {
+export function createServer(): { server: McpServer; cache: TTLCache } {
   const server = new McpServer({
     name: "gradescope-mcp",
     version: "1.0.0",
   });
 
-  // Placeholder cache - will be replaced with real TTLCache in Plan 01-02
-  const placeholderCache = {
-    clear: () => {
-      // No-op for scaffolding
-    },
-  };
-
   // Register tools
-  registerClearCacheTool(server, placeholderCache);
+  registerClearCacheTool(server, cache);
 
-  return server;
+  return { server, cache };
 }

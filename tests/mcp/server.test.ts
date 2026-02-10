@@ -10,13 +10,13 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 describe("createServer", () => {
   it("returns an McpServer instance", () => {
-    const server = createServer();
+    const { server } = createServer();
     expect(server).toBeDefined();
     expect(typeof server.connect).toBe("function");
   });
 
   it("server has gradescope-mcp name", async () => {
-    const server = createServer();
+    const { server } = createServer();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
     const client = new Client(
@@ -42,7 +42,7 @@ describe("createServer", () => {
   });
 
   it("server lists clear_cache tool", async () => {
-    const server = createServer();
+    const { server } = createServer();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
     const client = new Client(

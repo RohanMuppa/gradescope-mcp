@@ -23,7 +23,7 @@ process.on("unhandledRejection", (reason, promise) => {
 async function main(): Promise<void> {
   try {
     // Create MCP server instance
-    const server = createServer();
+    const { server } = createServer();
 
     // Create stdio transport
     const transport = new StdioServerTransport();
