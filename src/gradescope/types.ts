@@ -84,3 +84,61 @@ export interface GradescopeGrade {
   url: string;
   questions: GradeQuestion[];
 }
+
+/**
+ * Represents a single rubric item or autograder test case.
+ * Only applied items are included (deductions/credits that were actually applied).
+ */
+export interface RubricItem {
+  /** Rubric item name or test case name */
+  name: string;
+  /** Points earned/deducted for this item */
+  points: number;
+  /** Maximum possible points for this item */
+  maxPoints: number;
+  /** Whether this deduction/credit was applied (always true - applied only) */
+  applied: boolean;
+  /** Full rubric item description or test result description */
+  description: string;
+  /** Grader comment on this specific item (anonymized) */
+  comment?: string;
+  /** Which question this item belongs to (for grouping into question subtotals) */
+  questionName?: string;
+}
+
+/**
+ * Per-question score subtotal.
+ */
+export interface QuestionScore {
+  /** Question name (e.g., "Q1", "Question 1", "Test Suite: Arrays") */
+  name: string;
+  /** Points earned on this question */
+  score: number;
+  /** Maximum points for this question */
+  maxScore: number;
+  /** Whether this question has been graded */
+  status: "graded" | "pending";
+}
+
+/**
+ * Combined rubric items and feedback for an assignment submission.
+ * Handles all assignment types with graceful degradation.
+ */
+export interface RubricAndFeedback {
+  /** Data completeness indicator */
+  status: "complete" | "partial" | "pending" | "no_rubric";
+  /** Detected assignment type */
+  assignmentType: "homework" | "exam" | "programming" | "unknown";
+  /** Flat list of applied rubric items with questionName field for grouping */
+  rubricItems: RubricItem[];
+  /** Per-question score subtotals */
+  questionBreakdown: QuestionScore[];
+  /** Submission-level grader comments (anonymized) */
+  overallComments: string[];
+  /** Total score for the submission */
+  totalScore?: number;
+  /** Total max score */
+  totalMaxScore?: number;
+  /** Issues encountered during parsing (for debugging/transparency) */
+  warnings?: string[];
+}
