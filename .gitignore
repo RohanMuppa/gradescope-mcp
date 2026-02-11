@@ -4,3 +4,4 @@ build/
 .env
 *.tsbuildinfo
 coverage/
+FINGERPRINTS.md

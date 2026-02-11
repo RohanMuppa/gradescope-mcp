@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
 
 /**
  * Gradescope MCP Server entry point.
@@ -31,7 +36,7 @@ async function main(): Promise<void> {
     // Connect server to transport
     await server.connect(transport);
 
-    log("INFO", "Gradescope MCP Server running on stdio");
+    log("INFO", "Gradescope MCP Server v1.0.0 (Rohan Muppa) running on stdio");
   } catch (error) {
     log("ERROR", "Failed to start server:", error);
     process.exit(1);

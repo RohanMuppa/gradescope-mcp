@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * SessionStore manages encrypted session persistence to disk.
  * Uses AES-256-GCM encryption with machine-derived keys.
  */

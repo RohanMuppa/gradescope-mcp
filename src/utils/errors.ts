@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * Typed error system with machine-readable codes.
  * All Gradescope-related errors extend GradescopeError.
  */
@@ -66,7 +72,7 @@ export class ParseError extends GradescopeError {
   constructor(message: string, expected: string, found: string, cause?: Error) {
     super(
       "PARSE_FAILED",
-      message,
+      `[GSMCP-1001] ${message}`,
       { expected, found },
       "Gradescope may have changed their UI. Report this error.",
       cause
@@ -82,7 +88,7 @@ export class RateLimitedError extends GradescopeError {
   constructor(retryAfterMs?: number) {
     super(
       "RATE_LIMITED",
-      "Rate limited by Gradescope",
+      "[GSMCP-1002] Rate limited by Gradescope",
       retryAfterMs ? { retryAfterMs } : undefined,
       "Wait and retry"
     );
@@ -97,7 +103,7 @@ export class NetworkError extends GradescopeError {
   constructor(message: string, cause?: Error) {
     super(
       "NETWORK_ERROR",
-      message,
+      `[GSMCP-1003] ${message}`,
       undefined,
       "Check internet connection and retry",
       cause
@@ -113,7 +119,7 @@ export class AuthExpiredError extends GradescopeError {
   constructor() {
     super(
       "AUTH_EXPIRED",
-      "Authentication expired",
+      "[GSMCP-1004] Authentication expired",
       undefined,
       "Run the login tool to re-authenticate"
     );

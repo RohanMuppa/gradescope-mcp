@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * TTL-based cache with automatic expiration and size limits.
  * Supports per-entry TTLs, force refresh, and metadata queries.
  */

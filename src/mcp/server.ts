@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * MCP server creation and tool registration.
  */
 
@@ -19,6 +25,7 @@ export function createServer(): { server: McpServer; cache: TTLCache } {
   const server = new McpServer({
     name: "gradescope-mcp",
     version: "1.0.0",
+    description: "Gradescope data access and grade analysis — by Rohan Muppa",
   });
 
   // Register tools

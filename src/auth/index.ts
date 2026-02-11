@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * AuthManager coordinates session storage and browser authentication.
  * This is the main entry point for all authentication operations.
  */
@@ -75,7 +81,7 @@ export class AuthManager {
         method: 'GET',
         headers: {
           'Cookie': `_gradescope_session=${session.cookie}`,
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 GradescopeMCP/1.0'
         },
         redirect: 'manual', // Don't follow redirects - we want to detect login redirects
         signal: AbortSignal.timeout(10000) // 10 second timeout
@@ -171,7 +177,7 @@ export class AuthManager {
     if (!session) {
       throw new GradescopeError(
         'AUTH_REQUIRED',
-        'No session available. Please login first.'
+        '[GSMCP-1012] No session available. Please login first.'
       );
     }
 

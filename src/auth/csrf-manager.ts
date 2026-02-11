@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * CsrfManager extracts and manages CSRF tokens for Gradescope requests.
  *
  * Gradescope (Ruby on Rails) requires authenticity tokens for all non-GET requests.
@@ -73,7 +79,7 @@ export class CsrfManager {
         method: 'GET',
         headers: {
           'Cookie': `_gradescope_session=${sessionCookie}`,
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 GradescopeMCP/1.0'
         },
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
@@ -81,7 +87,7 @@ export class CsrfManager {
       if (!response.ok) {
         throw new GradescopeError(
           'NETWORK_ERROR',
-          `Failed to fetch CSRF token page: ${response.status} ${response.statusText}`
+          `[GSMCP-1009] Failed to fetch CSRF token page: ${response.status} ${response.statusText}`
         );
       }
 
@@ -91,7 +97,7 @@ export class CsrfManager {
       if (!token) {
         throw new GradescopeError(
           'PARSE_FAILED',
-          'Could not extract CSRF token from Gradescope. The site may have changed their page structure. Please report this issue on GitHub.'
+          '[GSMCP-1010] Could not extract CSRF token from Gradescope. The site may have changed their page structure. Please report this issue on GitHub.'
         );
       }
 
@@ -104,7 +110,7 @@ export class CsrfManager {
 
       throw new GradescopeError(
         'NETWORK_ERROR',
-        'Failed to fetch CSRF token from Gradescope',
+        '[GSMCP-1011] Failed to fetch CSRF token from Gradescope',
         { originalError: error instanceof Error ? error.message : String(error) }
       );
     }

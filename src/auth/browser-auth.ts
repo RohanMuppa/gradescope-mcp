@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * Browser-based authentication for Gradescope.
  * Launches visible Chromium for user to type email/password directly.
  * No credentials pass through MCP - user authenticates directly with Gradescope.
@@ -66,7 +72,7 @@ export class BrowserAuth {
         if (errorMessage.includes('net::') || errorMessage.includes('Network') || errorMessage.includes('timeout')) {
           throw new GradescopeError(
             'NETWORK_ERROR',
-            'Gradescope is unreachable. Check your internet connection.',
+            '[GSMCP-1005] Gradescope is unreachable. Check your internet connection.',
             { url: LOGIN_URL },
             'Verify your internet connection and try again',
             error instanceof Error ? error : undefined
@@ -102,7 +108,7 @@ export class BrowserAuth {
         if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
           throw new GradescopeError(
             'AUTH_EXPIRED',
-            'Login timed out. The browser window was open for 5 minutes without completing login.',
+            '[GSMCP-1006] Login timed out. The browser window was open for 5 minutes without completing login.',
             { timeoutMs: LOGIN_TIMEOUT },
             'Try again and complete login within 5 minutes'
           );
@@ -124,7 +130,7 @@ export class BrowserAuth {
         });
         throw new GradescopeError(
           'PARSE_FAILED',
-          'Could not capture session cookie after login. Gradescope may have changed their login flow. Please report this issue on GitHub.',
+          '[GSMCP-1007] Could not capture session cookie after login. Gradescope may have changed their login flow. Please report this issue on GitHub.',
           {
             availableCookies: cookies.map(c => c.name),
             url: page.url()
@@ -163,7 +169,7 @@ export class BrowserAuth {
       log('ERROR', 'Browser authentication failed', error);
       throw new GradescopeError(
         'UNKNOWN_ERROR',
-        error instanceof Error ? error.message : 'Unknown error during browser authentication',
+        `[GSMCP-1008] ${error instanceof Error ? error.message : 'Unknown error during browser authentication'}`,
         undefined,
         'Check the error details and try again',
         error instanceof Error ? error : undefined

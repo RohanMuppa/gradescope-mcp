@@ -1,4 +1,10 @@
 /**
+ * Gradescope MCP Server
+ * Copyright (c) 2025 Rohan Muppa. All rights reserved.
+ * Licensed under AGPL-3.0 — see LICENSE file for details.
+ */
+
+/**
  * Logger utility for MCP server.
  * All output goes to stderr to prevent stdout corruption.
  * Stdout is reserved exclusively for MCP JSON-RPC protocol.
