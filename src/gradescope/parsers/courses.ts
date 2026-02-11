@@ -12,6 +12,7 @@
 import * as cheerio from "cheerio";
 import { z } from "zod";
 import type { GradescopeCourse, CourseRole } from "../types.js";
+import { GRADESCOPE_BASE_URL } from "../types.js";
 import { ParseError } from "../../utils/errors.js";
 
 /**
@@ -25,6 +26,10 @@ const courseJsonSchema = z.array(
     term: z.string().optional().default(""),
     year: z.string().optional(),
     role: z.string().optional().default("unknown"),
+    instructor: z.string().optional(),
+    instructor_name: z.string().optional(),
+    enrollment_count: z.number().optional(),
+    students_count: z.number().optional(),
   })
 );
 
@@ -64,7 +69,9 @@ export function parseCourseJSON(data: unknown): GradescopeCourse[] {
     term: c.term,
     year: c.year,
     role: normalizeRole(c.role),
-    url: `/courses/${c.id}`,
+    instructorName: c.instructor_name ?? c.instructor,
+    enrollmentCount: c.enrollment_count ?? c.students_count,
+    url: `${GRADESCOPE_BASE_URL}/courses/${c.id}`,
   }));
 }
 
@@ -93,6 +100,28 @@ export function parseCourseHTML(html: string): GradescopeCourse[] {
       link.text().trim());
     const shortName = $el.find(".courseBox--shortname").text().trim() || undefined;
 
+    // Try to extract instructor name
+    let instructorName: string | undefined;
+    const instructorEl = $el.find(".courseBox--instructor, .instructor-name").text().trim();
+    if (instructorEl) {
+      instructorName = instructorEl;
+    } else {
+      // Try pattern matching "Instructor: Name"
+      const courseText = $el.text();
+      const instructorMatch = courseText.match(/Instructor:\s*([^\n]+)/i);
+      if (instructorMatch) {
+        instructorName = instructorMatch[1].trim();
+      }
+    }
+
+    // Try to extract enrollment count
+    let enrollmentCount: number | undefined;
+    const enrollmentText = $el.find(".courseBox--enrollment, .student-count").text().trim();
+    const enrollmentMatch = enrollmentText.match(/(\d+)\s*student/i);
+    if (enrollmentMatch) {
+      enrollmentCount = parseInt(enrollmentMatch[1], 10);
+    }
+
     // Try to extract term from parent section
     const section = $el.closest(".courseList--coursesForTerm");
     const term = section.find(".courseList--term").text().trim() || "";
@@ -112,7 +141,9 @@ export function parseCourseHTML(html: string): GradescopeCourse[] {
       shortName,
       term,
       role,
-      url: `/courses/${id}`,
+      instructorName,
+      enrollmentCount,
+      url: `${GRADESCOPE_BASE_URL}/courses/${id}`,
     });
   });
 
@@ -135,7 +166,7 @@ export function parseCourseHTML(html: string): GradescopeCourse[] {
         name,
         term: "",
         role: "unknown",
-        url: `/courses/${id}`,
+        url: `${GRADESCOPE_BASE_URL}/courses/${id}`,
       });
     });
   }

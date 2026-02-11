@@ -12,6 +12,7 @@
 import * as cheerio from "cheerio";
 import { z } from "zod";
 import type { GradescopeGrade, GradeQuestion } from "../types.js";
+import { GRADESCOPE_BASE_URL } from "../types.js";
 import { ParseError } from "../../utils/errors.js";
 
 /**
@@ -76,6 +77,7 @@ export function parseGradeJSON(
     score: g.score != null ? Number(g.score) : undefined,
     maxScore: g.max_score != null ? Number(g.max_score) : (g.total_points != null ? Number(g.total_points) : undefined),
     status: g.status,
+    url: `${GRADESCOPE_BASE_URL}/courses/${courseId}/assignments/${assignmentId}/submissions`,
     questions,
   };
 }
@@ -145,6 +147,7 @@ export function parseGradeHTML(
     score,
     maxScore,
     status,
+    url: `${GRADESCOPE_BASE_URL}/courses/${courseId}/assignments/${assignmentId}/submissions`,
     questions,
   };
 }
