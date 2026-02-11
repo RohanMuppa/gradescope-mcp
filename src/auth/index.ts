@@ -5,8 +5,10 @@
 
 import { SessionStore } from './session-store.js';
 import { BrowserAuth } from './browser-auth.js';
+import { CsrfManager } from './csrf-manager.js';
 import type { SessionData } from './types.js';
 import { log } from '../utils/logger.js';
+import { GradescopeError } from '../utils/errors.js';
 
 /**
  * AuthManager provides the public API for authentication.
@@ -15,6 +17,7 @@ import { log } from '../utils/logger.js';
 export class AuthManager {
   private readonly sessionStore: SessionStore;
   private readonly browserAuth: BrowserAuth;
+  private csrfManager = new CsrfManager();
 
   constructor(sessionDir?: string) {
     this.sessionStore = new SessionStore(sessionDir);
@@ -116,9 +119,10 @@ export class AuthManager {
 
   /**
    * Logout by clearing the stored session.
-   * Removes session file from disk.
+   * Removes session file from disk and invalidates CSRF token.
    */
   async logout(): Promise<void> {
+    this.csrfManager.invalidate();
     await this.sessionStore.clear();
     log('INFO', 'Session cleared');
   }
@@ -153,9 +157,30 @@ export class AuthManager {
     log('INFO', 'Session invalid, triggering auto-login');
     return await this.login();
   }
+
+  /**
+   * Get CSRF token for making authenticated POST/PATCH/DELETE requests.
+   * Returns cached token if valid, otherwise fetches fresh from Gradescope.
+   *
+   * @returns CSRF token string
+   * @throws {GradescopeError} If no session exists or token fetch fails
+   */
+  async getCsrfToken(): Promise<string> {
+    const session = await this.getSession();
+
+    if (!session) {
+      throw new GradescopeError(
+        'AUTH_REQUIRED',
+        'No session available. Please login first.'
+      );
+    }
+
+    return await this.csrfManager.getToken(session.cookie);
+  }
 }
 
 // Re-export types and classes for convenience
 export { SessionStore } from './session-store.js';
 export { BrowserAuth } from './browser-auth.js';
+export { CsrfManager } from './csrf-manager.js';
 export type { SessionData, EncryptedData, SessionFile } from './types.js';
