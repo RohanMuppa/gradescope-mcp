@@ -19,6 +19,7 @@ import { registerGetRubricAndFeedbackTool } from "./tools/get-rubric-and-feedbac
 import { registerGetSubmissionTool } from "./tools/get-submission.js";
 import { registerAnalyzeSubmissionTool } from "./tools/analyze-submission.js";
 import { registerScanRegradesTool } from "./tools/scan-regrades.js";
+import { registerFormatRegradeRequestTool } from "./tools/format-regrade-request.js";
 import { TTLCache } from "../utils/cache.js";
 import { TokenBucket } from "../utils/rate-limiter.js";
 import { AuthManager } from "../auth/index.js";
@@ -69,6 +70,7 @@ export function createServer(): {
   // Register analysis tools
   registerAnalyzeSubmissionTool(server, gsClient, cache);
   registerScanRegradesTool(server, gsClient, cache);
+  registerFormatRegradeRequestTool(server, gsClient, cache);
 
   return { server, cache, authManager, gsClient };
 }
