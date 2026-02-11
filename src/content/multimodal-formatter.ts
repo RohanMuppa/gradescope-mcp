@@ -10,6 +10,8 @@
  * Converts submission page images to MCP content blocks (text + base64 images).
  */
 
+import type { TextContent, ImageContent } from "@modelcontextprotocol/sdk/types.js";
+
 interface FormatterInput {
   pages: Array<{
     pageNumber: number;
@@ -24,13 +26,6 @@ interface FormatterInput {
   };
 }
 
-interface ContentBlock {
-  type: "text" | "image";
-  text?: string;
-  data?: string; // base64-encoded image
-  mimeType?: string; // "image/png" or "image/jpeg"
-}
-
 /**
  * Format submission pages as MCP multimodal content blocks.
  * Returns array of interleaved text and image content blocks.
@@ -41,8 +36,8 @@ interface ContentBlock {
  */
 export function formatAsMultimodalContent(
   input: FormatterInput
-): ContentBlock[] {
-  const contentBlocks: ContentBlock[] = [];
+): Array<TextContent | ImageContent> {
+  const contentBlocks: Array<TextContent | ImageContent> = [];
 
   // Build summary text
   const summaryLines: string[] = [
@@ -60,7 +55,7 @@ export function formatAsMultimodalContent(
 
   // Add summary text block
   contentBlocks.push({
-    type: "text",
+    type: "text" as const,
     text: summaryLines.join("\n"),
   });
 
@@ -68,14 +63,14 @@ export function formatAsMultimodalContent(
   for (const page of input.pages) {
     // Add image block
     contentBlocks.push({
-      type: "image",
+      type: "image" as const,
       data: page.imageBuffer.toString("base64"),
       mimeType: page.mimeType,
     });
 
     // Add page label
     contentBlocks.push({
-      type: "text",
+      type: "text" as const,
       text: `[Page ${page.pageNumber}]`,
     });
 
