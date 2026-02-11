@@ -14,8 +14,7 @@ import { registerLoginTool } from "./tools/login.js";
 import { registerCheckAuthTool } from "./tools/check-auth.js";
 import { registerLogoutTool } from "./tools/logout.js";
 import { registerGetCoursesTool } from "./tools/get-courses.js";
-import { registerGetAssignmentsTool } from "./tools/get-assignments.js";
-import { registerGetGradesTool } from "./tools/get-grades.js";
+import { registerGetGradesAndAssignmentsTool } from "./tools/get-grades-and-assignments.js";
 import { TTLCache } from "../utils/cache.js";
 import { TokenBucket } from "../utils/rate-limiter.js";
 import { AuthManager } from "../auth/index.js";
@@ -59,8 +58,7 @@ export function createServer(): {
 
   // Register data tools
   registerGetCoursesTool(server, gsClient, cache);
-  registerGetAssignmentsTool(server, gsClient, cache);
-  registerGetGradesTool(server, gsClient, cache);
+  registerGetGradesAndAssignmentsTool(server, gsClient, cache);
 
   return { server, cache, authManager, gsClient };
 }
