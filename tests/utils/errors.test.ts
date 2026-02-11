@@ -102,7 +102,7 @@ describe("AuthExpiredError", () => {
     const err = new AuthExpiredError();
     expect(err.code).toBe("AUTH_EXPIRED");
     expect(err.name).toBe("AuthExpiredError");
-    expect(err.message).toBe("Authentication expired");
+    expect(err.message).toBe("[GSMCP-1004] Authentication expired");
     expect(err.suggestedAction).toBe("Run the login tool to re-authenticate");
   });
 });
