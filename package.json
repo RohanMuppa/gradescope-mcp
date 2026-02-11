@@ -27,9 +27,12 @@
   "license": "AGPL-3.0-only",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@napi-rs/canvas": "^0.1.91",
     "cheerio": "^1.2.0",
     "dotenv": "^17.2.4",
     "playwright": "^1.58.2",
+    "sharp": "^0.34.5",
+    "unpdf": "^1.4.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
