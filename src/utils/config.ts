@@ -20,6 +20,7 @@ export const CACHE_TTLS = {
   assignments: 1_800_000,  // 30 minutes
   grades: 300_000,         // 5 minutes
   rubrics: 900_000,        // 15 minutes
+  analysis: 1_800_000,     // 30 minutes
 } as const;
 
 /**

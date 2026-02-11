@@ -232,3 +232,67 @@ export interface AnalysisResult {
   /** Questions skipped due to illegible content */
   illegibleQuestions: string[];
 }
+
+/**
+ * Regrade deadline information for an assignment.
+ */
+export interface DeadlineInfo {
+  /** Regrade window state */
+  status: "open" | "closed" | "unknown";
+  /** Formatted date string like "Feb 15, 2026" (null when unknown) */
+  absolute: string | null;
+  /** Countdown like "3 days left" (null when unknown) */
+  relative: string | null;
+  /** Raw Date object for sorting (null when unknown) */
+  deadlineDate: Date | null;
+}
+
+/**
+ * Scan result for one assignment with findings.
+ */
+export interface ScanResult {
+  /** Course ID */
+  courseId: string;
+  /** Course name */
+  courseName: string;
+  /** Assignment ID */
+  assignmentId: string;
+  /** Assignment name */
+  assignmentName: string;
+  /** Total points potentially recoverable */
+  estimatedRecovery: number;
+  /** e.g., "2 LIKELY, 1 POSSIBLE" */
+  confidenceBreakdown: string;
+  /** Formatted as "Feb 15 (3 days left)" or "Unknown -- check with instructor" */
+  deadline: string;
+  /** Days remaining for sorting (Infinity for unknown) */
+  deadlineSortKey: number;
+}
+
+/**
+ * Batch error for partial failure tracking.
+ */
+export interface BatchError {
+  /** Course ID */
+  courseId: string;
+  /** Course name */
+  courseName: string;
+  /** Assignment ID (optional, may be course-level error) */
+  assignmentId?: string;
+  /** Assignment name (optional) */
+  assignmentName?: string;
+  /** Error message */
+  error: string;
+}
+
+/**
+ * Grouped results for one course.
+ */
+export interface CourseResults {
+  /** Course ID */
+  courseId: string;
+  /** Course name */
+  courseName: string;
+  /** Assignments sorted by deadline urgency (soonest first) */
+  assignments: ScanResult[];
+}
