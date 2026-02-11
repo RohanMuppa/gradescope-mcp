@@ -17,7 +17,7 @@ import { z } from "zod";
 import { toolResponse, errorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
-import type { GradescopeCourse, GradescopeAssignment } from "../../gradescope/types.js";
+import type { GradescopeCourse, GradescopeAssignment, AnalysisResult, SubmissionPage } from "../../gradescope/types.js";
 import { parseCourseJSON, parseCourseHTML } from "../../gradescope/parsers/courses.js";
 import { parseAssignmentJSON, parseAssignmentHTML } from "../../gradescope/parsers/assignments.js";
 import { parseSubmissionPage } from "../../gradescope/parsers/submission.js";
@@ -38,17 +38,65 @@ import { optimizeForClaudeVision } from "../../content/image-optimizer.js";
 const MAX_BINARY_SIZE = 50 * 1024 * 1024; // 50MB
 
 /**
+ * Internal analysis result containing structured data and metadata.
+ * Returned by analyzeSubmissionInternal for composition with batch scanner.
+ */
+export interface AnalysisInternalResult {
+  /** Estimated analysis result based on rubric data (pre-Claude processing) */
+  analysis: AnalysisResult;
+  /** Submission page images */
+  submissionPages: SubmissionPage[];
+  /** Analysis prompt text */
+  analysisPrompt: string;
+  /** Additional metadata */
+  metadata: {
+    courseName: string;
+    assignmentName: string;
+    totalPages: number;
+    pagesIncluded: number;
+    questionsAnalyzed: number;
+  };
+}
+
+/**
+ * Type guard to check if result is AnalysisInternalResult (success) vs CallToolResult (error).
+ */
+export function isAnalysisInternalResult(
+  result: AnalysisInternalResult | CallToolResult
+): result is AnalysisInternalResult {
+  return (result as AnalysisInternalResult).analysis !== undefined;
+}
+
+/**
+ * Assemble multimodal MCP response from AnalysisInternalResult.
+ * Composes submission pages and analysis prompt into CallToolResult.
+ */
+export function assembleMultimodalResponse(
+  internalResult: AnalysisInternalResult
+): CallToolResult {
+  const contentBlocks = assembleAnalysisContent(
+    internalResult.submissionPages,
+    internalResult.analysisPrompt,
+    internalResult.metadata
+  );
+
+  return {
+    content: contentBlocks,
+  };
+}
+
+/**
  * Internal analysis function for composing with batch scanner.
  * Accepts already-resolved course and assignment objects (no fuzzy matching).
  * Fetches submission, parses rubric, identifies lost-point questions,
- * downloads content, builds analysis prompt, returns multimodal content blocks.
+ * downloads content, builds analysis prompt, returns structured AnalysisInternalResult.
  *
  * @param gsClient - Gradescope API client
  * @param cache - TTL cache for analysis results
  * @param course - Resolved course object
  * @param assignment - Resolved assignment object
  * @param forceRefresh - Bypass cache and fetch fresh data
- * @returns MCP CallToolResult with multimodal content or error response
+ * @returns AnalysisInternalResult with structured data or CallToolResult with error
  */
 export async function analyzeSubmissionInternal(
   gsClient: GradescopeClient,
@@ -56,7 +104,7 @@ export async function analyzeSubmissionInternal(
   course: GradescopeCourse,
   assignment: GradescopeAssignment,
   forceRefresh: boolean
-): Promise<CallToolResult> {
+): Promise<AnalysisInternalResult | CallToolResult> {
   try {
     // 1. Check if assignment has been graded
     if (assignment.score === undefined) {
@@ -192,18 +240,53 @@ export async function analyzeSubmissionInternal(
       maxScore: rubricData.totalMaxScore ?? assignment.maxScore ?? 0,
     });
 
-    // 9. Assemble multimodal content
-    const contentBlocks = assembleAnalysisContent(submissionPages, analysisPrompt, {
-      courseName: course.name,
-      assignmentName: assignment.name,
-      totalPages,
-      pagesIncluded: submissionPages.length,
-      questionsAnalyzed: lostPointQuestions.length,
-    });
+    // 9. Build estimated AnalysisResult based on rubric data
+    // This provides structured data for batch scanner without waiting for Claude's response
+    const currentScore = rubricData.totalScore ?? assignment.score ?? 0;
+    const maxScore = rubricData.totalMaxScore ?? assignment.maxScore ?? 0;
+    const estimatedRecovery = maxScore - currentScore; // All lost points are potential recovery
 
-    // 10. Return MCP response with multimodal content
-    const result: CallToolResult = {
-      content: contentBlocks,
+    // Create recommendations for each lost-point question (mark all as POSSIBLE)
+    const recommendations: Array<{
+      question: string;
+      rubricItem: string;
+      issue: string;
+      evidence: string;
+      confidence: "LIKELY" | "POSSIBLE";
+      potentialRecovery: number;
+    }> = lostPointQuestions.map((q) => ({
+      question: q.name,
+      rubricItem: "Pending analysis",
+      issue: "Points were lost on this question",
+      evidence: "See submission content",
+      confidence: "POSSIBLE" as const,
+      potentialRecovery: q.maxScore - q.score,
+    }));
+
+    const estimatedAnalysis: AnalysisResult = {
+      summary: {
+        currentScore,
+        maxScore,
+        totalFindings: lostPointQuestions.length,
+        estimatedRecovery,
+      },
+      recommendations,
+      noFindings: [],
+      illegibleQuestions: [],
+    };
+
+    // 10. Return structured AnalysisInternalResult
+    const result: AnalysisInternalResult = {
+      analysis: estimatedAnalysis,
+      submissionPages,
+      analysisPrompt,
+      metadata: {
+        courseName: course.name,
+        assignmentName: assignment.name,
+        totalPages,
+        pagesIncluded: submissionPages.length,
+        questionsAnalyzed: lostPointQuestions.length,
+      },
     };
     return result;
   } catch (error) {
@@ -290,13 +373,22 @@ export function registerAnalyzeSubmissionTool(
         }
 
         // 4. Call internal analysis function with resolved course and assignment
-        return await analyzeSubmissionInternal(
+        const analysisResult = await analyzeSubmissionInternal(
           gsClient,
           cache,
           matchedCourse,
           matchedAssignment,
           forceRefresh ?? false
         );
+
+        // 5. Check if success (AnalysisInternalResult) or error (CallToolResult)
+        if (isAnalysisInternalResult(analysisResult)) {
+          // Success path: assemble multimodal response
+          return assembleMultimodalResponse(analysisResult);
+        } else {
+          // Error path: return error response directly
+          return analysisResult;
+        }
       } catch (error) {
         if (error instanceof GradescopeError) {
           return errorResponse(error);

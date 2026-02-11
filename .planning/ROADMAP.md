@@ -17,8 +17,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Course & Assignment Data** - List courses, assignments, and scores via MCP tools
 - [x] **Phase 4: Rubric & Feedback Access** - Per-question rubric breakdowns and grader comments
 - [x] **Phase 5: Submission Download & Content Pipeline** - PDF/image download with multimodal content preparation
-- [ ] **Phase 6: Single Assignment Analysis** - AI-powered grade defense analysis for individual assignments
-- [ ] **Phase 7: Batch Scanning & Deadline Tracking** - Scan all graded work and track regrade windows
+- [x] **Phase 6: Single Assignment Analysis** - AI-powered grade defense analysis for individual assignments
+- [x] **Phase 7: Batch Scanning & Deadline Tracking** - Scan all graded work and track regrade windows
 - [ ] **Phase 8: Regrade Request Formatting** - Copy-pasteable regrade text matching Gradescope's form
 - [ ] **Phase 9: Security Hardening & Privacy Protection** - Comprehensive security audit, credential protection, data scrubbing, and privacy controls
 - [x] **Phase 10: Proprietary Protections** - AGPL-3.0 licensing, copyright headers, error code fingerprints, and runtime attribution
@@ -119,9 +119,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Analysis types, Zod output schemas, and prompt builder (rubric comparison instructions, evidence citing, confidence framing, tone guidance)
-- [ ] 06-02-PLAN.md -- Multimodal content assembler (images-first ordering, lost-point page targeting, buffer cleanup)
-- [ ] 06-03-PLAN.md -- MCP tool: `analyze_submission` composing rubric + submission into multimodal content blocks, registered in server
+- [x] 06-01-PLAN.md -- Analysis types, Zod output schemas, and prompt builder (rubric comparison instructions, evidence citing, confidence framing, tone guidance)
+- [x] 06-02-PLAN.md -- Multimodal content assembler (images-first ordering, lost-point page targeting, buffer cleanup)
+- [x] 06-03-PLAN.md -- MCP tool: `analyze_submission` composing rubric + submission into multimodal content blocks, registered in server
 
 ### Phase 7: Batch Scanning & Deadline Tracking
 **Goal**: User can scan all graded assignments across all courses at once to find regrade opportunities, with awareness of which regrade windows are still open
@@ -133,12 +133,12 @@ Plans:
   3. Regrade window deadlines are tracked and displayed for each assignment (e.g., "3 days remaining to dispute")
   4. Assignments with closed regrade windows are flagged but still shown for informational purposes
   5. Scan is efficient -- uses cached data where available and respects rate limits even when processing many assignments
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Regrade window detection (scrape regrade UI elements, compute deadlines)
-- [ ] 07-02: Batch scanning orchestration (iterate courses/assignments, aggregate results, manage rate limits)
-- [ ] 07-03: MCP tool: `scan_regrades` with deadline-aware summary output
+- [x] 07-01-PLAN.md -- Domain types (DeadlineInfo, ScanResult, BatchError, CourseResults), deadline detection parser with multi-selector fallback, analysis cache TTL
+- [x] 07-02-PLAN.md -- Extract analyzeSubmissionInternal for internal composition, batch scanning orchestrator with deadline-aware grouping, progress notifications, partial failure handling
+- [x] 07-03-PLAN.md -- Register scan_regrades tool in MCP server, verify full build
 
 ### Phase 8: Regrade Request Formatting
 **Goal**: User receives regrade recommendations formatted as copy-pasteable text that matches Gradescope's regrade request form, ready to submit manually
@@ -232,7 +232,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 3. Course & Assignment Data                | 0/4            | Not started | -          |
 | 4. Rubric & Feedback Access                | 2/2            | Complete    | 2026-02-11 |
 | 5. Submission Download & Content Pipeline  | 3/3            | Complete    | 2026-02-11 |
-| 6. Single Assignment Analysis              | 0/3            | Not started | -          |
+| 6. Single Assignment Analysis              | 3/3            | Complete    | 2026-02-11 |
 | 7. Batch Scanning & Deadline Tracking      | 0/3            | Not started | -          |
 | 8. Regrade Request Formatting              | 0/2            | Not started | -          |
 | 9. Security Hardening & Privacy Protection | 0/15           | Not started | -          |
