@@ -13,8 +13,13 @@ import { registerClearCacheTool } from "./tools/clear-cache.js";
 import { registerLoginTool } from "./tools/login.js";
 import { registerCheckAuthTool } from "./tools/check-auth.js";
 import { registerLogoutTool } from "./tools/logout.js";
+import { registerGetCoursesTool } from "./tools/get-courses.js";
+import { registerGetAssignmentsTool } from "./tools/get-assignments.js";
+import { registerGetGradesTool } from "./tools/get-grades.js";
 import { TTLCache } from "../utils/cache.js";
+import { TokenBucket } from "../utils/rate-limiter.js";
 import { AuthManager } from "../auth/index.js";
+import { GradescopeClient } from "../gradescope/client.js";
 
 // Shared cache instance used across all server tools
 const cache = new TTLCache();
@@ -22,24 +27,40 @@ const cache = new TTLCache();
 // Shared auth manager instance used across all server tools
 const authManager = new AuthManager();
 
+// Rate limiter: 5 burst capacity, 1 token/sec refill
+const rateLimiter = new TokenBucket(5, 1);
+
+// HTTP client for Gradescope data access
+const gsClient = new GradescopeClient(authManager, cache, rateLimiter);
+
 /**
  * Create and configure the MCP server instance.
  * Registers all available tools.
  *
- * @returns Object containing configured MCP server, cache instance, and auth manager
+ * @returns Object containing configured MCP server, cache instance, auth manager, and client
  */
-export function createServer(): { server: McpServer; cache: TTLCache; authManager: AuthManager } {
+export function createServer(): {
+  server: McpServer;
+  cache: TTLCache;
+  authManager: AuthManager;
+  gsClient: GradescopeClient;
+} {
   const server = new McpServer({
     name: "gradescope-mcp",
     version: "1.0.0",
     description: "Gradescope data access and grade analysis — by Rohan Muppa",
   });
 
-  // Register tools
+  // Register auth tools
   registerClearCacheTool(server, cache);
   registerLoginTool(server, authManager);
   registerCheckAuthTool(server, authManager);
   registerLogoutTool(server, authManager);
 
-  return { server, cache, authManager };
+  // Register data tools
+  registerGetCoursesTool(server, gsClient, cache);
+  registerGetAssignmentsTool(server, gsClient, cache);
+  registerGetGradesTool(server, gsClient, cache);
+
+  return { server, cache, authManager, gsClient };
 }

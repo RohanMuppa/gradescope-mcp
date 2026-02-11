@@ -6,8 +6,13 @@
 
 /**
  * Gradescope domain types.
- * These are placeholder types that will be expanded in Phase 3.
+ * Course, assignment, and grade data models.
  */
+
+/**
+ * Role a user holds in a Gradescope course.
+ */
+export type CourseRole = "student" | "instructor" | "ta" | "reader" | "unknown";
 
 /**
  * Represents a Gradescope course.
@@ -15,8 +20,11 @@
 export interface GradescopeCourse {
   id: string;
   name: string;
+  shortName?: string;
   term: string;
-  role: string;
+  year?: string;
+  role: CourseRole;
+  url: string;
 }
 
 /**
@@ -24,19 +32,33 @@ export interface GradescopeCourse {
  */
 export interface GradescopeAssignment {
   id: string;
+  courseId: string;
   name: string;
   dueDate?: string;
   status?: string;
   score?: number;
   maxScore?: number;
+  url: string;
 }
 
 /**
- * Represents a Gradescope grade.
+ * Per-question grade breakdown.
+ */
+export interface GradeQuestion {
+  name: string;
+  score?: number;
+  maxScore?: number;
+}
+
+/**
+ * Represents a Gradescope grade for a specific assignment.
  */
 export interface GradescopeGrade {
   assignmentId: string;
+  courseId: string;
+  assignmentName?: string;
   score?: number;
   maxScore?: number;
   status?: string;
+  questions: GradeQuestion[];
 }
