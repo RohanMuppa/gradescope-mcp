@@ -19,6 +19,7 @@ const BASE_URL = "https://www.gradescope.com";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 GradescopeMCP/1.0";
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_BINARY_SIZE = 50 * 1024 * 1024; // 50MB
 
 interface FetchOptions {
   ttl?: number;
@@ -72,6 +73,84 @@ export class GradescopeClient {
       this.cache.set(cacheKey, data, options.ttl);
     }
     return data;
+  }
+
+  /**
+   * Fetch binary content (PDFs, images) from Gradescope.
+   * Returns raw Response object for caller to extract arrayBuffer.
+   * Not cached due to large size.
+   */
+  async getRaw(path: string): Promise<Response> {
+    await this.rateLimiter.consume();
+
+    const session = await this.authManager.getSession();
+    if (!session) {
+      throw new GradescopeError(
+        "AUTH_REQUIRED",
+        "[GSMCP-1013] No active session. Please login first.",
+        undefined,
+        "Run the login tool to authenticate"
+      );
+    }
+
+    const url = `${BASE_URL}${path}`;
+    log("DEBUG", `Fetching binary content from ${url}`);
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Cookie: `_gradescope_session=${session.cookie}`,
+          "User-Agent": USER_AGENT,
+          Accept: "*/*",
+        },
+        redirect: "manual",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+
+      // Detect redirect to login page (session expired)
+      if (response.status === 301 || response.status === 302) {
+        const location = response.headers.get("location") ?? "";
+        if (location.includes("/login")) {
+          throw new GradescopeError(
+            "AUTH_EXPIRED",
+            "[GSMCP-1013] Session expired during binary download. Please login again.",
+            { path },
+            "Run the login tool to re-authenticate"
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new GradescopeError(
+          "NETWORK_ERROR",
+          `[GSMCP-1015] HTTP ${response.status} ${response.statusText}`,
+          { path, status: response.status },
+          "Check if Gradescope is accessible and retry"
+        );
+      }
+
+      // Check content size if available
+      const contentLength = response.headers.get("content-length");
+      if (contentLength && parseInt(contentLength, 10) > MAX_BINARY_SIZE) {
+        throw new GradescopeError(
+          "NETWORK_ERROR",
+          `[GSMCP-1015] Binary content too large (${contentLength} bytes, max ${MAX_BINARY_SIZE})`,
+          { path, size: contentLength },
+          "File exceeds maximum allowed size for download"
+        );
+      }
+
+      return response;
+    } catch (error) {
+      if (error instanceof GradescopeError) {
+        throw error;
+      }
+      throw new NetworkError(
+        `[GSMCP-1016] Network error fetching binary from ${path}: ${String(error)}`,
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   /**

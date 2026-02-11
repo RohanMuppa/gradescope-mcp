@@ -142,3 +142,42 @@ export interface RubricAndFeedback {
   /** Issues encountered during parsing (for debugging/transparency) */
   warnings?: string[];
 }
+
+/**
+ * A single page image from a submission (PDF page or scanned exam image).
+ */
+export interface SubmissionPage {
+  /** 1-indexed page number */
+  pageNumber: number;
+  /** Raw image buffer (PNG or JPEG) */
+  imageBuffer: Buffer;
+  /** MIME type of the image */
+  mimeType: "image/png" | "image/jpeg";
+}
+
+/**
+ * Question-to-page mapping from Gradescope submission metadata.
+ * Used for targeted page retrieval when analyzing specific questions.
+ */
+export interface PageMapping {
+  /** Question name (e.g., "Q1", "Question 1") */
+  questionName: string;
+  /** 1-indexed page numbers assigned to this question */
+  pageNumbers: number[];
+}
+
+/**
+ * Parsed submission content metadata from submission page HTML.
+ */
+export interface SubmissionContent {
+  /** URL path to download the submission file (PDF or image) */
+  downloadUrl: string;
+  /** Content type of the submission */
+  contentType: "pdf" | "image";
+  /** Total number of pages (if determinable from HTML) */
+  totalPages?: number;
+  /** Question-to-page mappings (if available from Gradescope outline) */
+  pageMappings: PageMapping[] | null;
+  /** Individual page image URLs (for scanned exams with per-page images) */
+  pageImageUrls?: string[];
+}
