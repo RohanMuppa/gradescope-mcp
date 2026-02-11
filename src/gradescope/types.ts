@@ -128,7 +128,7 @@ export interface RubricAndFeedback {
   /** Data completeness indicator */
   status: "complete" | "partial" | "pending" | "no_rubric";
   /** Detected assignment type */
-  assignmentType: "homework" | "exam" | "programming" | "unknown";
+  assignmentType: AssignmentType;
   /** Flat list of applied rubric items with questionName field for grouping */
   rubricItems: RubricItem[];
   /** Per-question score subtotals */
