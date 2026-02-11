@@ -11,7 +11,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult, TextContent } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { toolResponse, errorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
@@ -27,6 +27,8 @@ import {
   fetchCourses,
   fetchAssignments,
   analyzeSubmissionInternal,
+  isAnalysisInternalResult,
+  type AnalysisInternalResult,
 } from "./analyze-submission.js";
 import { detectRegradeDeadline, formatDeadline } from "../../gradescope/parsers/deadlines.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
@@ -146,10 +148,10 @@ export function registerScanRegradesTool(
               const cacheKey = `gs:analysis:${currentCourse.id}:${assignment.id}`;
               const cachedAnalysis = cache.get(cacheKey, refresh);
 
-              let analysisResult: CallToolResult;
+              let analysisResult: AnalysisInternalResult | CallToolResult;
               if (cachedAnalysis !== undefined) {
                 log("DEBUG", `Using cached analysis for ${assignment.name}`);
-                analysisResult = cachedAnalysis as CallToolResult;
+                analysisResult = cachedAnalysis as AnalysisInternalResult | CallToolResult;
               } else {
                 // Perform analysis
                 try {
@@ -176,21 +178,11 @@ export function registerScanRegradesTool(
                 }
               }
 
-              // Check if analysis returned no_findings (perfect score or error response)
-              if (
-                analysisResult.content &&
-                Array.isArray(analysisResult.content) &&
-                analysisResult.content.length > 0
-              ) {
-                const firstContent = analysisResult.content[0] as TextContent;
-                if (
-                  firstContent.type === "text" &&
-                  typeof firstContent.text === "string" &&
-                  firstContent.text.includes('"status":"no_findings"')
-                ) {
-                  log("DEBUG", `No findings for ${assignment.name}, skipping`);
-                  continue;
-                }
+              // Check if analysis succeeded (AnalysisInternalResult) or failed (CallToolResult error)
+              if (!isAnalysisInternalResult(analysisResult)) {
+                // Error response from analyzeSubmissionInternal
+                log("DEBUG", `Analysis error for ${assignment.name}, skipping`);
+                continue;
               }
 
               // Detect deadline
@@ -215,38 +207,17 @@ export function registerScanRegradesTool(
                 continue;
               }
 
-              // Extract estimated recovery from analysis result
-              // The analysis result is multimodal content - we need to parse the text content
-              let estimatedRecovery = 0;
-              let confidenceBreakdown = "0 LIKELY, 0 POSSIBLE";
+              // Extract estimated recovery from typed AnalysisResult (no regex/JSON parsing needed)
+              const estimatedRecovery = analysisResult.analysis.summary.estimatedRecovery;
 
-              if (
-                analysisResult.content &&
-                Array.isArray(analysisResult.content)
-              ) {
-                for (const content of analysisResult.content) {
-                  const textContent = content as TextContent;
-                  if (textContent.type === "text" && typeof textContent.text === "string") {
-                    // Try to parse JSON from text content
-                    try {
-                      const match = textContent.text.match(/\{[\s\S]*"estimatedRecovery"[\s\S]*\}/);
-                      if (match) {
-                        const parsed = JSON.parse(match[0]);
-                        estimatedRecovery = parsed.estimatedRecovery || 0;
-
-                        // Calculate confidence breakdown
-                        if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
-                          const likely = parsed.recommendations.filter((r: any) => r.confidence === "LIKELY").length;
-                          const possible = parsed.recommendations.filter((r: any) => r.confidence === "POSSIBLE").length;
-                          confidenceBreakdown = `${likely} LIKELY, ${possible} POSSIBLE`;
-                        }
-                      }
-                    } catch {
-                      // Parsing failed, use defaults
-                    }
-                  }
-                }
-              }
+              // Calculate confidence breakdown from recommendations
+              const likely = analysisResult.analysis.recommendations.filter(
+                (r) => r.confidence === "LIKELY"
+              ).length;
+              const possible = analysisResult.analysis.recommendations.filter(
+                (r) => r.confidence === "POSSIBLE"
+              ).length;
+              const confidenceBreakdown = `${likely} LIKELY, ${possible} POSSIBLE`;
 
               // Add to results
               results.push({
