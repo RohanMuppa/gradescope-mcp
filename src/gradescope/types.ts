@@ -181,3 +181,54 @@ export interface SubmissionContent {
   /** Individual page image URLs (for scanned exams with per-page images) */
   pageImageUrls?: string[];
 }
+
+/**
+ * Confidence level for a regrade recommendation. Binary per user decision.
+ */
+export type AnalysisConfidence = "LIKELY" | "POSSIBLE";
+
+/**
+ * A single regrade recommendation for one rubric item.
+ */
+export interface AnalysisRecommendation {
+  /** Which question this finding belongs to (e.g., "Q1", "Question 3") */
+  question: string;
+  /** The specific rubric item name where points may have been incorrectly deducted */
+  rubricItem: string;
+  /** Description of the potential grading error */
+  issue: string;
+  /** Evidence from the submission (direct quote or description) */
+  evidence: string;
+  /** Binary confidence: LIKELY (strong evidence) or POSSIBLE (worth checking) */
+  confidence: AnalysisConfidence;
+  /** Points that could potentially be recovered */
+  potentialRecovery: number;
+}
+
+/**
+ * Summary section at top of analysis output.
+ */
+export interface AnalysisSummary {
+  /** Current total score on the assignment */
+  currentScore: number;
+  /** Maximum possible score */
+  maxScore: number;
+  /** Number of findings across all questions */
+  totalFindings: number;
+  /** Estimated total recoverable points */
+  estimatedRecovery: number;
+}
+
+/**
+ * Complete analysis result for one assignment.
+ */
+export interface AnalysisResult {
+  /** Top-level summary stats */
+  summary: AnalysisSummary;
+  /** Per-question recommendations, organized by question */
+  recommendations: AnalysisRecommendation[];
+  /** Questions that were analyzed but had no findings */
+  noFindings: string[];
+  /** Questions skipped due to illegible content */
+  illegibleQuestions: string[];
+}
