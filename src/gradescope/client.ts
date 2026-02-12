@@ -12,6 +12,7 @@
 import type { AuthManager } from "../auth/index.js";
 import type { TTLCache } from "../utils/cache.js";
 import type { TokenBucket } from "../utils/rate-limiter.js";
+import type { AbuseDetector } from "../security/abuse-detector.js";
 import { GradescopeError, NetworkError } from "../utils/errors.js";
 import { log } from "../utils/logger.js";
 import { validateDomain } from "../security/tls-enforcer.js";
@@ -30,13 +31,14 @@ interface FetchOptions {
 /**
  * HTTP client that wraps authenticated Gradescope requests.
  * Provides getText and getJSON methods with caching, rate limiting,
- * and automatic session expiry detection with retry.
+ * abuse detection, and automatic session expiry detection with retry.
  */
 export class GradescopeClient {
   constructor(
     private readonly authManager: AuthManager,
     private readonly cache: TTLCache,
-    private readonly rateLimiter: TokenBucket
+    private readonly rateLimiter: TokenBucket,
+    private readonly abuseDetector: AbuseDetector
   ) {}
 
   /**
@@ -82,6 +84,7 @@ export class GradescopeClient {
    * Not cached due to large size.
    */
   async getRaw(path: string): Promise<Response> {
+    this.abuseDetector.checkAbuse();
     await this.rateLimiter.consume();
 
     const session = await this.authManager.getSession();
@@ -198,6 +201,7 @@ export class GradescopeClient {
     path: string,
     cookie: string
   ): Promise<{ body: string; redirectedToLogin: boolean }> {
+    this.abuseDetector.checkAbuse();
     await this.rateLimiter.consume();
 
     const url = `${BASE_URL}${path}`;
