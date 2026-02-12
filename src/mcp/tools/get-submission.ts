@@ -261,8 +261,11 @@ async function fetchCourses(
   try {
     const json = await gsClient.getJSON("/courses.json", { forceRefresh: true });
     const courses = parseCourseJSON(json);
-    cache.set(cacheKey, courses, CACHE_TTLS.courses);
-    return courses;
+    if (courses.length > 0) {
+      cache.set(cacheKey, courses, CACHE_TTLS.courses);
+      return courses;
+    }
+    log("DEBUG", "JSON endpoint returned empty array, falling back to HTML");
   } catch (jsonError) {
     log("DEBUG", "JSON course fetch failed, falling back to HTML", jsonError);
   }
