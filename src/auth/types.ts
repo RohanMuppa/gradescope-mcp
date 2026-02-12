@@ -18,6 +18,8 @@ export interface SessionData {
   capturedAt: number;
   /** Optional: any additional cookies captured during login (e.g., CSRF tokens) */
   extraCookies?: Record<string, string>;
+  /** Optional: local session expiry timestamp (epoch ms). Sessions expire after 24 hours. */
+  expiresAt?: number;
 }
 
 /**

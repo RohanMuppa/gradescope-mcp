@@ -51,10 +51,22 @@ export class BrowserAuth {
 
       log('INFO', 'Browser launched successfully');
 
-      // Create browser context with reasonable viewport
+      // Create browser context with reasonable viewport and NO persistent storage
       const context: BrowserContext = await browser.newContext({
         viewport: { width: 1280, height: 720 },
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        storageState: undefined // Explicit: no persistent storage
+      });
+
+      // Apply domain allowlist BEFORE creating page to block third-party requests
+      const ALLOWED_DOMAINS = ['gradescope.com', 'purdue.edu'];
+      await context.route('**/*', (route) => {
+        const url = route.request().url();
+        if (ALLOWED_DOMAINS.some(domain => url.includes(domain))) {
+          route.continue();
+        } else {
+          route.abort('blockedbyclient');
+        }
       });
 
       const page: Page = await context.newPage();
