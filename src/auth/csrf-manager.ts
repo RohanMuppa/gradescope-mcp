@@ -67,18 +67,27 @@ export class CsrfManager {
    * Fetch a fresh CSRF token from Gradescope.
    * Makes a GET request to /account page and extracts the token from HTML.
    *
-   * @param sessionCookie - The _gradescope_session cookie value
+   * @param session - Session data containing cookie and optional extraCookies
    * @returns Extracted CSRF token
    * @throws {GradescopeError} If extraction fails
    */
-  async fetchToken(sessionCookie: string): Promise<string> {
+  async fetchToken(session: { cookie: string; extraCookies?: Record<string, string> }): Promise<string> {
     try {
       log('DEBUG', 'Fetching fresh CSRF token from Gradescope');
+
+      // Build complete cookie header including all cookies
+      const cookies = [`_gradescope_session=${session.cookie}`];
+      if (session.extraCookies) {
+        for (const [name, value] of Object.entries(session.extraCookies)) {
+          cookies.push(`${name}=${value}`);
+        }
+      }
+      const cookieHeader = cookies.join('; ');
 
       const response = await fetch('https://www.gradescope.com/account', {
         method: 'GET',
         headers: {
-          'Cookie': `_gradescope_session=${sessionCookie}`,
+          'Cookie': cookieHeader,
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 GradescopeMCP/1.0'
         },
         signal: AbortSignal.timeout(10000) // 10 second timeout
@@ -121,11 +130,11 @@ export class CsrfManager {
    * Returns cached token if it exists and is less than TOKEN_MAX_AGE old.
    * Otherwise fetches a fresh token.
    *
-   * @param sessionCookie - The _gradescope_session cookie value
+   * @param session - Session data containing cookie and optional extraCookies
    * @returns CSRF token
    * @throws {GradescopeError} If fetching fails
    */
-  async getToken(sessionCookie: string): Promise<string> {
+  async getToken(session: { cookie: string; extraCookies?: Record<string, string> }): Promise<string> {
     const age = Date.now() - this.extractedAt;
 
     // Return cached token if still valid
@@ -136,7 +145,7 @@ export class CsrfManager {
 
     // Fetch fresh token
     log('DEBUG', 'CSRF token expired or missing, fetching fresh');
-    return await this.fetchToken(sessionCookie);
+    return await this.fetchToken(session);
   }
 
   /**
