@@ -146,6 +146,8 @@ export class SessionStore {
     try {
       // Ensure session directory exists with restricted permissions (owner-only)
       await fs.mkdir(this.sessionDir, { recursive: true, mode: 0o700 });
+      // Explicitly set permissions (recursive: true may not apply mode correctly)
+      await fs.chmod(this.sessionDir, 0o700);
 
       const plaintext = JSON.stringify(session);
       const encrypted = this.encrypt(plaintext);
