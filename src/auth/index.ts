@@ -16,6 +16,7 @@ import type { SessionData } from './types.js';
 import { log } from '../utils/logger.js';
 import { GradescopeError } from '../utils/errors.js';
 import { isSessionExpired, setSessionExpiry } from '../utils/session-timeout.js';
+import { validateDomain } from '../security/tls-enforcer.js';
 
 /**
  * AuthManager provides the public API for authentication.
@@ -85,7 +86,10 @@ export class AuthManager {
     try {
       log('DEBUG', 'Validating session with health check');
 
-      const response = await fetch('https://www.gradescope.com/account', {
+      const healthCheckUrl = 'https://www.gradescope.com/account';
+      validateDomain(healthCheckUrl);
+
+      const response = await fetch(healthCheckUrl, {
         method: 'GET',
         headers: {
           'Cookie': `_gradescope_session=${session.cookie}`,

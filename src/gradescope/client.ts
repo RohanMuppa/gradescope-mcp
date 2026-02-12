@@ -14,6 +14,7 @@ import type { TTLCache } from "../utils/cache.js";
 import type { TokenBucket } from "../utils/rate-limiter.js";
 import { GradescopeError, NetworkError } from "../utils/errors.js";
 import { log } from "../utils/logger.js";
+import { validateDomain } from "../security/tls-enforcer.js";
 
 const BASE_URL = "https://www.gradescope.com";
 const USER_AGENT =
@@ -94,6 +95,7 @@ export class GradescopeClient {
     }
 
     const url = `${BASE_URL}${path}`;
+    validateDomain(url);
     log("DEBUG", `Fetching binary content from ${url}`);
 
     try {
@@ -199,6 +201,7 @@ export class GradescopeClient {
     await this.rateLimiter.consume();
 
     const url = `${BASE_URL}${path}`;
+    validateDomain(url);
     log("DEBUG", `Fetching ${url}`);
 
     try {
