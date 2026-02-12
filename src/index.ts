@@ -13,9 +13,13 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./mcp/server.js";
 import { enableStdoutGuard, log } from "./utils/logger.js";
+import { enforceTLS } from "./security/tls-enforcer.js";
 
 // Enable stdout guard immediately to prevent stdout corruption
 enableStdoutGuard();
+
+// Enforce TLS validation at startup
+enforceTLS();
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
