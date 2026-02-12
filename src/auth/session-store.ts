@@ -54,6 +54,22 @@ export class SessionStore {
   }
 
   /**
+   * Compute HMAC-SHA256 of encrypted data for integrity verification.
+   * Uses the same machine-derived key as encryption.
+   */
+  private computeHmac(encrypted: EncryptedData): string {
+    const key = this.deriveKey();
+    const hmac = crypto.createHmac("sha256", key);
+
+    // Hash IV + authTag + data in order
+    hmac.update(encrypted.iv);
+    hmac.update(encrypted.authTag);
+    hmac.update(encrypted.data);
+
+    return hmac.digest("hex");
+  }
+
+  /**
    * Encrypt plaintext using AES-256-GCM.
    * Returns IV, auth tag, and ciphertext as hex strings.
    */
@@ -94,6 +110,34 @@ export class SessionStore {
   }
 
   /**
+   * Verify and enforce file permissions on session directory and file.
+   * Ensures directory is 0700 (owner-only) and file is 0600 (owner read/write only).
+   */
+  private async verifyPermissions(): Promise<void> {
+    try {
+      // Check session directory permissions
+      const dirStat = await fs.stat(this.sessionDir);
+      const dirMode = dirStat.mode & 0o777;
+      if (dirMode !== 0o700) {
+        log("WARN", `Session directory permissions incorrect (${dirMode.toString(8)}), fixing to 0700`);
+        await fs.chmod(this.sessionDir, 0o700);
+      }
+
+      // Check session file permissions
+      const fileStat = await fs.stat(this.sessionFilePath);
+      const fileMode = fileStat.mode & 0o777;
+      if (fileMode !== 0o600) {
+        log("WARN", `Session file permissions incorrect (${fileMode.toString(8)}), fixing to 0600`);
+        await fs.chmod(this.sessionFilePath, 0o600);
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      log("WARN", `Failed to verify permissions: ${err.message}`);
+      // Don't throw - graceful degradation
+    }
+  }
+
+  /**
    * Save session data to disk with encryption.
    * Creates session directory with 0700 permissions if it doesn't exist.
    * Writes session file with 0600 permissions.
@@ -106,10 +150,14 @@ export class SessionStore {
       const plaintext = JSON.stringify(session);
       const encrypted = this.encrypt(plaintext);
 
+      // Compute HMAC for integrity verification
+      const hmac = this.computeHmac(encrypted);
+
       const sessionFile: SessionFile = {
         version: SESSION_VERSION,
         encrypted,
         createdAt: Date.now(),
+        hmac,
       };
 
       await fs.writeFile(
@@ -118,7 +166,7 @@ export class SessionStore {
         { encoding: "utf-8", mode: 0o600 }
       );
 
-      log("DEBUG", `Session saved to ${this.sessionFilePath}`);
+      log("DEBUG", "Session saved with HMAC integrity protection");
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       log("ERROR", `Failed to save session: ${err.message}`);
@@ -141,15 +189,30 @@ export class SessionStore {
         return null;
       }
 
+      // Verify and enforce permissions
+      await this.verifyPermissions();
+
       // Read and parse session file
       const fileContent = await fs.readFile(this.sessionFilePath, "utf-8");
       const sessionFile: SessionFile = JSON.parse(fileContent);
+
+      // Verify HMAC integrity (if present)
+      if (sessionFile.hmac) {
+        const expectedHmac = this.computeHmac(sessionFile.encrypted);
+        if (sessionFile.hmac !== expectedHmac) {
+          log("WARN", "Session file HMAC mismatch - possible tampering detected, triggering re-auth");
+          return null;
+        }
+      } else {
+        // Legacy session file without HMAC - still allow for backward compatibility
+        log("DEBUG", "Session file has no HMAC (legacy format)");
+      }
 
       // Decrypt session data
       const plaintext = this.decrypt(sessionFile.encrypted);
       const session: SessionData = JSON.parse(plaintext);
 
-      log("DEBUG", `Session loaded from ${this.sessionFilePath}`);
+      log("DEBUG", "Session loaded and verified");
       return session;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));

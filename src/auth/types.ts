@@ -44,4 +44,6 @@ export interface SessionFile {
   encrypted: EncryptedData;
   /** When this session file was created (epoch ms) */
   createdAt: number;
+  /** Optional: HMAC-SHA256 of encrypted data for integrity verification */
+  hmac?: string;
 }
