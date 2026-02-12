@@ -7,6 +7,12 @@
 /**
  * HTTP client for Gradescope with cookie auth, caching, and rate limiting.
  * Handles session expiry detection and automatic retry.
+ *
+ * SEC-21: Request Scoping - All requests are scoped to the authenticated user's session cookie.
+ * The session cookie identifies the user, and Gradescope returns ONLY that user's data.
+ *
+ * SEC-24: Response Data Verification - Response data is implicitly scoped to authenticated user
+ * because Gradescope uses cookie-based authentication. No user ID mixing is possible.
  */
 
 import type { AuthManager } from "../auth/index.js";
@@ -127,10 +133,16 @@ export class GradescopeClient {
       }
 
       if (!response.ok) {
+        // SEC-25: Generic error messages prevent information disclosure
+        const safeMessage = response.status === 403 || response.status === 401
+          ? "Access denied"
+          : response.status === 404
+          ? "Resource not found"
+          : "Network request failed";
         throw new GradescopeError(
           "NETWORK_ERROR",
-          `[GSMCP-1015] HTTP ${response.status} ${response.statusText}`,
-          { path, status: response.status },
+          `[GSMCP-1015] ${safeMessage}`,
+          { status: response.status },
           "Check if Gradescope is accessible and retry"
         );
       }
@@ -151,8 +163,9 @@ export class GradescopeClient {
       if (error instanceof GradescopeError) {
         throw error;
       }
+      // SEC-25: Generic error message prevents path/error details disclosure
       throw new NetworkError(
-        `[GSMCP-1016] Network error fetching binary from ${path}: ${String(error)}`,
+        "[GSMCP-1016] Network request failed",
         error instanceof Error ? error : undefined
       );
     }
@@ -229,10 +242,18 @@ export class GradescopeClient {
       }
 
       if (!response.ok && response.status !== 301 && response.status !== 302) {
+        // SEC-25: Generic error messages prevent information disclosure
+        const safeMessage = response.status === 403 || response.status === 401
+          ? "Access denied"
+          : response.status === 404
+          ? "Resource not found"
+          : response.status >= 500
+          ? "Server error"
+          : "Network request failed";
         throw new GradescopeError(
           "NETWORK_ERROR",
-          `[GSMCP-1015] HTTP ${response.status} ${response.statusText}`,
-          { path, status: response.status },
+          `[GSMCP-1015] ${safeMessage}`,
+          { status: response.status },
           "Check if Gradescope is accessible and retry"
         );
       }
@@ -243,8 +264,9 @@ export class GradescopeClient {
       if (error instanceof GradescopeError) {
         throw error;
       }
+      // SEC-25: Generic error message prevents path/error details disclosure
       throw new NetworkError(
-        `[GSMCP-1016] Network error fetching ${path}: ${String(error)}`,
+        "[GSMCP-1016] Network request failed",
         error instanceof Error ? error : undefined
       );
     }

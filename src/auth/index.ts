@@ -40,6 +40,9 @@ export class AuthManager {
    * If a valid session already exists, skips browser launch and returns cached session.
    * Otherwise, launches browser for user to type credentials directly.
    *
+   * SEC-22: Session Isolation - Exactly one authenticated user per server instance.
+   * On new login, purge existing session completely (including cache and CSRF token).
+   *
    * @returns SessionData with captured cookie
    * @throws {GradescopeError} If login fails
    */
@@ -50,6 +53,11 @@ export class AuthManager {
       log('INFO', 'Skipping login -- valid session exists');
       return authCheck.session;
     }
+
+    // SEC-22: Purge existing session before new login to enforce single-user-per-instance
+    // This prevents session mixing and ensures clean state for new authentication
+    log('INFO', 'Purging existing session before new login');
+    await this.logout();
 
     // No valid session - launch browser for login
     log('INFO', 'No valid session found, launching browser for authentication');

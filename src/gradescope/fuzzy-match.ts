@@ -7,6 +7,10 @@
 /**
  * Fuzzy course name matching utility.
  * Resolves course IDs and names to course objects.
+ *
+ * SEC-23: Anti-Enumeration - Course IDs and names come exclusively from the authenticated
+ * user's own course list (fetched via cookie-scoped request). No external IDs accepted.
+ * This prevents enumeration attacks where attacker tries arbitrary course IDs.
  */
 
 import type { GradescopeCourse } from "./types.js";
