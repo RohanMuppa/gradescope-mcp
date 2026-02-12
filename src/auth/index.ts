@@ -17,6 +17,7 @@ import { log } from '../utils/logger.js';
 import { GradescopeError } from '../utils/errors.js';
 import { isSessionExpired, setSessionExpiry } from '../utils/session-timeout.js';
 import { validateDomain } from '../security/tls-enforcer.js';
+import type { TTLCache } from '../utils/cache.js';
 
 /**
  * AuthManager provides the public API for authentication.
@@ -26,10 +27,12 @@ export class AuthManager {
   private readonly sessionStore: SessionStore;
   private readonly browserAuth: BrowserAuth;
   private csrfManager = new CsrfManager();
+  private readonly cache?: TTLCache;
 
-  constructor(sessionDir?: string) {
+  constructor(sessionDir?: string, cache?: TTLCache) {
     this.sessionStore = new SessionStore(sessionDir);
     this.browserAuth = new BrowserAuth();
+    this.cache = cache;
   }
 
   /**
@@ -138,10 +141,18 @@ export class AuthManager {
   /**
    * Logout by clearing the stored session.
    * Removes session file from disk and invalidates CSRF token.
+   * Also clears in-memory cache if provided to constructor.
    */
   async logout(): Promise<void> {
     this.csrfManager.invalidate();
     await this.sessionStore.clear();
+
+    // Clear in-memory cache if available
+    if (this.cache) {
+      this.cache.clear();
+      log('DEBUG', 'Cache cleared during logout');
+    }
+
     log('INFO', 'Session cleared');
   }
 

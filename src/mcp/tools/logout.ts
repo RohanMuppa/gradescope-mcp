@@ -13,16 +13,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { toolResponse } from "../tool-helpers.js";
 import { AuthManager } from "../../auth/index.js";
+import type { TTLCache } from "../../utils/cache.js";
 
 /**
  * Register the logout tool with the MCP server.
  *
  * @param server - MCP server instance
  * @param authManager - AuthManager instance for authentication
+ * @param cache - Shared cache instance for cleanup
  */
 export function registerLogoutTool(
   server: McpServer,
-  authManager: AuthManager
+  authManager: AuthManager,
+  cache: TTLCache
 ): void {
   server.registerTool(
     "logout",
@@ -34,6 +37,8 @@ export function registerLogoutTool(
     },
     async () => {
       await authManager.logout();
+      // Explicit cache clear for comprehensive cleanup
+      cache.clear();
       return toolResponse({
         status: "logged_out",
         message: "Gradescope session cleared. You will need to login again.",

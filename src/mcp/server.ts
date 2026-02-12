@@ -24,18 +24,22 @@ import { TTLCache } from "../utils/cache.js";
 import { TokenBucket } from "../utils/rate-limiter.js";
 import { AuthManager } from "../auth/index.js";
 import { GradescopeClient } from "../gradescope/client.js";
+import { AbuseDetector } from "../security/abuse-detector.js";
 
 // Shared cache instance used across all server tools
 const cache = new TTLCache();
 
-// Shared auth manager instance used across all server tools
-const authManager = new AuthManager();
+// Shared auth manager instance used across all server tools (with cache for cleanup)
+const authManager = new AuthManager(undefined, cache);
 
 // Rate limiter: 5 burst capacity, 1 token/sec refill
 const rateLimiter = new TokenBucket(5, 1);
 
+// Abuse detector: 50 requests/min with 1 min cooldown
+const abuseDetector = new AbuseDetector();
+
 // HTTP client for Gradescope data access
-const gsClient = new GradescopeClient(authManager, cache, rateLimiter);
+const gsClient = new GradescopeClient(authManager, cache, rateLimiter, abuseDetector);
 
 /**
  * Create and configure the MCP server instance.
@@ -59,7 +63,7 @@ export function createServer(): {
   registerClearCacheTool(server, cache);
   registerLoginTool(server, authManager);
   registerCheckAuthTool(server, authManager);
-  registerLogoutTool(server, authManager);
+  registerLogoutTool(server, authManager, cache);
 
   // Register data tools
   registerGetCoursesTool(server, gsClient, cache);
