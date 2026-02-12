@@ -12,7 +12,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toolResponse, errorResponse } from "../tool-helpers.js";
+import { toolResponse, errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type { GradescopeCourse, GradescopeAssignment, AssignmentType } from "../../gradescope/types.js";
@@ -20,6 +20,7 @@ import { parseCourseJSON, parseCourseHTML } from "../../gradescope/parsers/cours
 import { parseAssignmentJSON, parseAssignmentHTML } from "../../gradescope/parsers/assignments.js";
 import { parseGradeJSON, parseGradeHTML } from "../../gradescope/parsers/grades.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
+import { validateName } from "../../security/input-validator.js";
 import { CACHE_TTLS } from "../../utils/config.js";
 import { GradescopeError } from "../../utils/errors.js";
 import { log } from "../../utils/logger.js";
@@ -55,6 +56,9 @@ export function registerGetGradesAndAssignmentsTool(
     },
     async ({ course, type, forceRefresh }) => {
       try {
+        // Validate inputs
+        validateName(course, 'course');
+
         // 1. Fetch all courses and resolve course via fuzzy match
         const courses = await fetchCourses(gsClient, cache, forceRefresh ?? false);
         const matchedCourse = fuzzyMatchCourse(courses, course);
@@ -175,13 +179,7 @@ export function registerGetGradesAndAssignmentsTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1024] Unexpected error fetching grades and assignments",
-            { error: String(error), course }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );

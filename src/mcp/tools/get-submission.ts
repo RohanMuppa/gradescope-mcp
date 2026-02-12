@@ -13,7 +13,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, TextContent, ImageContent } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { errorResponse } from "../tool-helpers.js";
+import { errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type { GradescopeCourse, GradescopeAssignment } from "../../gradescope/types.js";
@@ -21,6 +21,7 @@ import { parseCourseJSON, parseCourseHTML } from "../../gradescope/parsers/cours
 import { parseAssignmentJSON, parseAssignmentHTML } from "../../gradescope/parsers/assignments.js";
 import { parseSubmissionPage } from "../../gradescope/parsers/submission.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
+import { validateName } from "../../security/input-validator.js";
 import { CACHE_TTLS } from "../../utils/config.js";
 import { GradescopeError } from "../../utils/errors.js";
 import { log } from "../../utils/logger.js";
@@ -68,6 +69,13 @@ export function registerGetSubmissionTool(
     },
     async ({ course, assignment, question, forceRefresh }) => {
       try {
+        // Validate inputs
+        validateName(course, 'course');
+        validateName(assignment, 'assignment');
+        if (question) {
+          validateName(question, 'question');
+        }
+
         // 1. Fetch all courses and resolve course via fuzzy match
         const courses = await fetchCourses(gsClient, cache, forceRefresh ?? false);
         const matchedCourse = fuzzyMatchCourse(courses, course);
@@ -229,13 +237,7 @@ export function registerGetSubmissionTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1036] Unexpected error fetching submission content",
-            { error: String(error), course, assignment, question }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );

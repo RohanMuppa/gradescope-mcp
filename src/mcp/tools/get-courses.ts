@@ -11,7 +11,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toolResponse, errorResponse } from "../tool-helpers.js";
+import { toolResponse, errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type { GradescopeCourse } from "../../gradescope/types.js";
@@ -102,13 +102,7 @@ export function registerGetCoursesTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1020] Unexpected error fetching courses",
-            { error: String(error) }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );
