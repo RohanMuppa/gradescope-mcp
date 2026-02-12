@@ -113,10 +113,19 @@ export class AuthManager {
       const healthCheckUrl = 'https://www.gradescope.com/account';
       validateDomain(healthCheckUrl);
 
+      // Build complete cookie header including extraCookies
+      const cookies = [`_gradescope_session=${session.cookie}`];
+      if (session.extraCookies) {
+        for (const [name, value] of Object.entries(session.extraCookies)) {
+          cookies.push(`${name}=${value}`);
+        }
+      }
+      const cookieHeader = cookies.join('; ');
+
       const response = await fetch(healthCheckUrl, {
         method: 'GET',
         headers: {
-          'Cookie': `_gradescope_session=${session.cookie}`,
+          'Cookie': cookieHeader,
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 GradescopeMCP/1.0'
         },
         redirect: 'manual', // Don't follow redirects - we want to detect login redirects

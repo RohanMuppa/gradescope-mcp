@@ -108,10 +108,12 @@ export class GradescopeClient {
     log("DEBUG", `Fetching binary content from ${url}`);
 
     try {
+      const cookieHeader = this.buildCookieHeader(session);
+
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          Cookie: `_gradescope_session=${session.cookie}`,
+          Cookie: cookieHeader,
           "User-Agent": USER_AGENT,
           Accept: "*/*",
         },
@@ -186,13 +188,13 @@ export class GradescopeClient {
       );
     }
 
-    const result = await this.doFetch(path, session.cookie);
+    const result = await this.doFetch(path, session);
 
     // Redirect to login = session expired, retry once with fresh session
     if (result.redirectedToLogin) {
       log("INFO", `Session expired during fetch of ${path}, re-authenticating`);
       const freshSession = await this.authManager.ensureAuth();
-      const retry = await this.doFetch(path, freshSession.cookie);
+      const retry = await this.doFetch(path, freshSession);
       if (retry.redirectedToLogin) {
         throw new GradescopeError(
           "AUTH_EXPIRED",
@@ -208,11 +210,27 @@ export class GradescopeClient {
   }
 
   /**
+   * Build complete Cookie header from session data.
+   * Includes _gradescope_session and all extraCookies (signed_token, remember_me, etc.).
+   */
+  private buildCookieHeader(session: { cookie: string; extraCookies?: Record<string, string> }): string {
+    const cookies = [`_gradescope_session=${session.cookie}`];
+
+    if (session.extraCookies) {
+      for (const [name, value] of Object.entries(session.extraCookies)) {
+        cookies.push(`${name}=${value}`);
+      }
+    }
+
+    return cookies.join("; ");
+  }
+
+  /**
    * Execute a single HTTP request to Gradescope.
    */
   private async doFetch(
     path: string,
-    cookie: string
+    session: { cookie: string; extraCookies?: Record<string, string> }
   ): Promise<{ body: string; redirectedToLogin: boolean }> {
     this.abuseDetector.checkAbuse();
     await this.rateLimiter.consume();
@@ -222,10 +240,12 @@ export class GradescopeClient {
     log("DEBUG", `Fetching ${url}`);
 
     try {
+      const cookieHeader = this.buildCookieHeader(session);
+
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          Cookie: `_gradescope_session=${cookie}`,
+          Cookie: cookieHeader,
           "User-Agent": USER_AGENT,
           Accept: "text/html,application/json",
         },
