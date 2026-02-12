@@ -10,6 +10,8 @@
  * Stdout is reserved exclusively for MCP JSON-RPC protocol.
  */
 
+import { scrubPII } from "../security/pii-scrubber.js";
+
 type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG";
 
 /**
@@ -19,16 +21,20 @@ type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG";
 export function enableStdoutGuard(): void {
   const originalLog = console.log;
   console.log = (...args: unknown[]) => {
-    console.error("[STDOUT-GUARD] console.log intercepted:", ...args);
+    const scrubbedArgs = args.map((arg) => scrubPII(arg));
+    console.error("[STDOUT-GUARD] console.log intercepted:", ...scrubbedArgs);
   };
 }
 
 /**
  * Log a message to stderr with timestamp and level prefix.
  * Format: [YYYY-MM-DDTHH:mm:ss.sssZ] [LEVEL] message
+ * All arguments are scrubbed for PII before output.
  */
 export function log(level: LogLevel, message: string, ...args: unknown[]): void {
   const timestamp = new Date().toISOString();
   const prefix = `[${timestamp}] [${level}]`;
-  console.error(prefix, message, ...args);
+  const scrubbedMessage = scrubPII(message);
+  const scrubbedArgs = args.map((arg) => scrubPII(arg));
+  console.error(prefix, scrubbedMessage, ...scrubbedArgs);
 }
