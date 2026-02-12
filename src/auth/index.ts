@@ -15,6 +15,7 @@ import { CsrfManager } from './csrf-manager.js';
 import type { SessionData } from './types.js';
 import { log } from '../utils/logger.js';
 import { GradescopeError } from '../utils/errors.js';
+import { isSessionExpired, setSessionExpiry } from '../utils/session-timeout.js';
 
 /**
  * AuthManager provides the public API for authentication.
@@ -50,11 +51,12 @@ export class AuthManager {
     log('INFO', 'No valid session found, launching browser for authentication');
     const sessionData = await this.browserAuth.login();
 
-    // Save the captured session
-    await this.sessionStore.save(sessionData);
+    // Wrap session with expiry timestamp before saving
+    const sessionWithExpiry = setSessionExpiry(sessionData);
+    await this.sessionStore.save(sessionWithExpiry);
     log('INFO', 'Session saved successfully');
 
-    return sessionData;
+    return sessionWithExpiry;
   }
 
   /**
@@ -70,6 +72,12 @@ export class AuthManager {
 
     if (!session) {
       log('DEBUG', 'No session found in storage');
+      return { valid: false, session: null };
+    }
+
+    // Check local expiry BEFORE health check
+    if (isSessionExpired(session)) {
+      log('DEBUG', 'Session expired (local timeout)');
       return { valid: false, session: null };
     }
 
@@ -141,7 +149,12 @@ export class AuthManager {
    * @returns SessionData or null
    */
   async getSession(): Promise<SessionData | null> {
-    return await this.sessionStore.load();
+    const session = await this.sessionStore.load();
+    if (session && isSessionExpired(session)) {
+      log('DEBUG', 'Session expired (local timeout), returning null');
+      return null;
+    }
+    return session;
   }
 
   /**
