@@ -242,7 +242,7 @@ export class AuthManager {
       );
     }
 
-    return await this.csrfManager.getToken(session.cookie);
+    return await this.csrfManager.getToken(session);
   }
 }
 
