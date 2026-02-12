@@ -242,13 +242,21 @@ export class GradescopeClient {
     try {
       const cookieHeader = this.buildCookieHeader(session);
 
+      // Build headers - add X-Requested-With for .json endpoints
+      const headers: Record<string, string> = {
+        Cookie: cookieHeader,
+        "User-Agent": USER_AGENT,
+        Accept: "text/html,application/json",
+      };
+
+      // Rails/Gradescope .json endpoints require X-Requested-With to distinguish AJAX from direct navigation
+      if (path.endsWith(".json")) {
+        headers["X-Requested-With"] = "XMLHttpRequest";
+      }
+
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Cookie: cookieHeader,
-          "User-Agent": USER_AGENT,
-          Accept: "text/html,application/json",
-        },
+        headers,
         redirect: "manual",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
