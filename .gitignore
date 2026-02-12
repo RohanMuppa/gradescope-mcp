@@ -2,6 +2,12 @@
 node_modules/
 build/
 .env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.json
+.gradescope-session/
 *.tsbuildinfo
 coverage/
 FINGERPRINTS.md
