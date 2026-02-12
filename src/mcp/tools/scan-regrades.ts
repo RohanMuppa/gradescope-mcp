@@ -13,7 +13,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { toolResponse, errorResponse } from "../tool-helpers.js";
+import { toolResponse, errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type {
@@ -32,6 +32,7 @@ import {
 } from "./analyze-submission.js";
 import { detectRegradeDeadline, formatDeadline } from "../../gradescope/parsers/deadlines.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
+import { validateName } from "../../security/input-validator.js";
 import { GradescopeError } from "../../utils/errors.js";
 import { log } from "../../utils/logger.js";
 
@@ -67,6 +68,11 @@ export function registerScanRegradesTool(
     },
     async ({ course, forceRefresh }) => {
       try {
+        // Validate inputs
+        if (course) {
+          validateName(course, 'course');
+        }
+
         const refresh = forceRefresh ?? false;
 
         // 1. Fetch all courses
@@ -298,13 +304,7 @@ export function registerScanRegradesTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1071] Unexpected error during batch scan",
-            { error: String(error), course }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );

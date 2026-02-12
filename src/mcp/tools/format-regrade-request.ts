@@ -13,7 +13,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { toolResponse, errorResponse } from "../tool-helpers.js";
+import { toolResponse, errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import {
@@ -25,6 +25,7 @@ import {
   type AnalysisInternalResult,
 } from "./analyze-submission.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
+import { validateName } from "../../security/input-validator.js";
 import { CACHE_TTLS } from "../../utils/config.js";
 import { GradescopeError } from "../../utils/errors.js";
 import { log } from "../../utils/logger.js";
@@ -68,6 +69,13 @@ export function registerFormatRegradeRequestTool(
     },
     async ({ course, assignment, question, forceRefresh }) => {
       try {
+        // Validate inputs
+        validateName(course, 'course');
+        validateName(assignment, 'assignment');
+        if (question) {
+          validateName(question, 'question');
+        }
+
         const refresh = forceRefresh ?? false;
 
         // 1. Resolve course via fuzzy match
@@ -197,13 +205,7 @@ export function registerFormatRegradeRequestTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1081] Unexpected error formatting regrade request",
-            { error: String(error), course, assignment }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );

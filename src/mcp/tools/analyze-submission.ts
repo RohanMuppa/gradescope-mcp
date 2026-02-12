@@ -14,7 +14,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, TextContent, ImageContent } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { toolResponse, errorResponse } from "../tool-helpers.js";
+import { toolResponse, errorResponse, safeErrorResponse } from "../tool-helpers.js";
 import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type { GradescopeCourse, GradescopeAssignment, AnalysisResult, SubmissionPage } from "../../gradescope/types.js";
@@ -23,6 +23,7 @@ import { parseAssignmentJSON, parseAssignmentHTML } from "../../gradescope/parse
 import { parseSubmissionPage } from "../../gradescope/parsers/submission.js";
 import { parseRubricAndFeedback } from "../../gradescope/parsers/rubric.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
+import { validateName } from "../../security/input-validator.js";
 import { CACHE_TTLS } from "../../utils/config.js";
 import { GradescopeError } from "../../utils/errors.js";
 import { log } from "../../utils/logger.js";
@@ -293,13 +294,7 @@ export async function analyzeSubmissionInternal(
     if (error instanceof GradescopeError) {
       return errorResponse(error);
     }
-    return errorResponse(
-      new GradescopeError(
-        "UNKNOWN_ERROR",
-        "[GSMCP-1037] Unexpected error analyzing submission",
-        { error: String(error), courseId: course.id, assignmentId: assignment.id }
-      )
-    );
+    return safeErrorResponse(error);
   }
 }
 
@@ -335,6 +330,10 @@ export function registerAnalyzeSubmissionTool(
     },
     async ({ course, assignment, forceRefresh }) => {
       try {
+        // Validate inputs
+        validateName(course, 'course');
+        validateName(assignment, 'assignment');
+
         // 1. Fetch all courses and resolve course via fuzzy match
         const courses = await fetchCourses(gsClient, cache, forceRefresh ?? false);
         const matchedCourse = fuzzyMatchCourse(courses, course);
@@ -393,13 +392,7 @@ export function registerAnalyzeSubmissionTool(
         if (error instanceof GradescopeError) {
           return errorResponse(error);
         }
-        return errorResponse(
-          new GradescopeError(
-            "UNKNOWN_ERROR",
-            "[GSMCP-1037] Unexpected error analyzing submission",
-            { error: String(error), course, assignment }
-          )
-        );
+        return safeErrorResponse(error);
       }
     }
   );
