@@ -14,6 +14,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createServer } from "./mcp/server.js";
 import { enableStdoutGuard, log } from "./utils/logger.js";
 import { runStartupChecks } from "./security/runtime-checks.js";
+import { auditTrail } from "./security/audit-trail.js";
 
 // Enable stdout guard immediately to prevent stdout corruption
 enableStdoutGuard();
@@ -33,6 +34,9 @@ async function main(): Promise<void> {
   try {
     // Create MCP server instance
     const { server, cache } = createServer();
+
+    // Rotate audit trail at startup
+    await auditTrail.rotate();
 
     // Create stdio transport
     const transport = new StdioServerTransport();

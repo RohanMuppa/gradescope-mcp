@@ -11,6 +11,7 @@
 
 import { GradescopeError } from "../utils/errors.js";
 import { log } from "../utils/logger.js";
+import { auditTrail } from "./audit-trail.js";
 
 const WINDOW_MS = 60_000; // 1 minute sliding window
 const THRESHOLD = 50; // Max requests per window
@@ -55,6 +56,7 @@ export class AbuseDetector {
       }
       // Cooldown expired, reset halt state
       log("INFO", "Abuse detector cooldown expired, resuming normal operation");
+      auditTrail.record("ABUSE_COOLDOWN_EXPIRED");
       this.haltedUntil = null;
       this.requestTimestamps = [];
     }
@@ -70,6 +72,10 @@ export class AbuseDetector {
       log("WARN", `Abuse threshold exceeded: ${this.requestTimestamps.length} requests in last ${WINDOW_MS}ms`);
       this.haltedUntil = now + this.cooldownMs;
       const cooldownSeconds = Math.ceil(this.cooldownMs / 1000);
+
+      // Record abuse detection event
+      auditTrail.record("ABUSE_DETECTED", "GSMCP-9020");
+
       throw new GradescopeError(
         "RATE_LIMITED",
         `[GSMCP-9020] Traffic abuse detected. Exceeded ${this.threshold} requests per minute. All requests blocked for ${cooldownSeconds} seconds.`,

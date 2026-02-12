@@ -18,6 +18,7 @@ import { GradescopeError } from '../utils/errors.js';
 import { isSessionExpired, setSessionExpiry } from '../utils/session-timeout.js';
 import { validateDomain } from '../security/tls-enforcer.js';
 import type { TTLCache } from '../utils/cache.js';
+import { auditTrail } from '../security/audit-trail.js';
 
 /**
  * AuthManager provides the public API for authentication.
@@ -61,14 +62,25 @@ export class AuthManager {
 
     // No valid session - launch browser for login
     log('INFO', 'No valid session found, launching browser for authentication');
-    const sessionData = await this.browserAuth.login();
 
-    // Wrap session with expiry timestamp before saving
-    const sessionWithExpiry = setSessionExpiry(sessionData);
-    await this.sessionStore.save(sessionWithExpiry);
-    log('INFO', 'Session saved successfully');
+    try {
+      const sessionData = await this.browserAuth.login();
 
-    return sessionWithExpiry;
+      // Wrap session with expiry timestamp before saving
+      const sessionWithExpiry = setSessionExpiry(sessionData);
+      await this.sessionStore.save(sessionWithExpiry);
+      log('INFO', 'Session saved successfully');
+
+      // Record successful login
+      await auditTrail.record('LOGIN_SUCCESS');
+
+      return sessionWithExpiry;
+    } catch (error) {
+      // Record failed login with error code if available
+      const code = error instanceof GradescopeError ? error.code : undefined;
+      await auditTrail.record('LOGIN_FAILED', code);
+      throw error;
+    }
   }
 
   /**
@@ -90,6 +102,7 @@ export class AuthManager {
     // Check local expiry BEFORE health check
     if (isSessionExpired(session)) {
       log('DEBUG', 'Session expired (local timeout)');
+      await auditTrail.record('SESSION_EXPIRED');
       return { valid: false, session: null };
     }
 
@@ -160,6 +173,9 @@ export class AuthManager {
       this.cache.clear();
       log('DEBUG', 'Cache cleared during logout');
     }
+
+    // Record logout event
+    await auditTrail.record('LOGOUT');
 
     log('INFO', 'Session cleared');
   }
