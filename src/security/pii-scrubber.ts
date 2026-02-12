@@ -135,7 +135,12 @@ export function scrubObject<T>(obj: T): T {
 
   // Handle arrays
   if (Array.isArray(obj)) {
-    return obj.map((item) => scrubObject(item)) as T;
+    return obj.map((item) => {
+      if (typeof item === "string") {
+        return scrubPII(item);
+      }
+      return scrubObject(item);
+    }) as T;
   }
 
   // Handle objects
