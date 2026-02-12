@@ -20,6 +20,7 @@ import { registerGetSubmissionTool } from "./tools/get-submission.js";
 import { registerAnalyzeSubmissionTool } from "./tools/analyze-submission.js";
 import { registerScanRegradesTool } from "./tools/scan-regrades.js";
 import { registerFormatRegradeRequestTool } from "./tools/format-regrade-request.js";
+import { registerPrivacyReportTool } from "./tools/privacy-report.js";
 import { TTLCache } from "../utils/cache.js";
 import { TokenBucket } from "../utils/rate-limiter.js";
 import { AuthManager } from "../auth/index.js";
@@ -64,6 +65,7 @@ export function createServer(): {
   registerLoginTool(server, authManager);
   registerCheckAuthTool(server, authManager);
   registerLogoutTool(server, authManager, cache);
+  registerPrivacyReportTool(server, authManager, cache);
 
   // Register data tools
   registerGetCoursesTool(server, gsClient, cache);
