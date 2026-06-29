@@ -86,68 +86,45 @@ export function parseCourseHTML(html: string): GradescopeCourse[] {
   const $ = cheerio.load(html);
   const courses: GradescopeCourse[] = [];
 
-  // Gradescope organizes courses in sections by role (Student, Instructor, etc.)
-  $(".courseList--coursesForTerm .courseBox").each((_i, el) => {
+  // Gradescope dashboard: .courseBox is the <a> tag itself (not a wrapper around one).
+  // Structure: .courseList--term (sibling) then .courseList--coursesForTerm > a.courseBox
+  $(".courseList--coursesForTerm a.courseBox[href*='/courses/']").each((_i, el) => {
     const $el = $(el);
-    const link = $el.find("a[href*='/courses/']").first();
-    const href = link.attr("href") ?? "";
+    const href = $el.attr("href") ?? "";
     const idMatch = href.match(/\/courses\/(\d+)/);
     if (!idMatch) return;
 
     const id = idMatch[1];
-    const name = ($el.find(".courseBox--shortname").text().trim() ||
+
+    // Use title attributes for clean names (avoids grabbing child text nodes)
+    const shortName =
+      $el.find(".courseBox--shortname").attr("title")?.trim() ||
+      $el.find(".courseBox--shortname").text().trim() ||
+      undefined;
+    const fullName =
+      $el.find(".courseBox--name").attr("title")?.trim() ||
       $el.find(".courseBox--name").text().trim() ||
-      link.text().trim());
-    const shortName = $el.find(".courseBox--shortname").text().trim() || undefined;
+      undefined;
+    const name = fullName || shortName || `Course ${id}`;
 
-    // Try to extract instructor name
-    let instructorName: string | undefined;
-    const instructorEl = $el.find(".courseBox--instructor, .instructor-name").text().trim();
-    if (instructorEl) {
-      instructorName = instructorEl;
-    } else {
-      // Try pattern matching "Instructor: Name"
-      const courseText = $el.text();
-      const instructorMatch = courseText.match(/Instructor:\s*([^\n]+)/i);
-      if (instructorMatch) {
-        instructorName = instructorMatch[1].trim();
-      }
-    }
-
-    // Try to extract enrollment count
-    let enrollmentCount: number | undefined;
-    const enrollmentText = $el.find(".courseBox--enrollment, .student-count").text().trim();
-    const enrollmentMatch = enrollmentText.match(/(\d+)\s*student/i);
-    if (enrollmentMatch) {
-      enrollmentCount = parseInt(enrollmentMatch[1], 10);
-    }
-
-    // Try to extract term from parent section
+    // Term is the preceding sibling .courseList--term of the parent .courseList--coursesForTerm
     const section = $el.closest(".courseList--coursesForTerm");
-    const term = section.find(".courseList--term").text().trim() || "";
+    const term = section.prev(".courseList--term").text().trim() || "";
 
-    // Extract role from section heading
-    const roleSection = $el.closest(".courseList--courseContainer");
-    const roleHeading = roleSection.prev("h1, h2, h3").text().trim().toLowerCase();
-    let role: CourseRole = "unknown";
-    if (roleHeading.includes("student")) role = "student";
-    else if (roleHeading.includes("instructor")) role = "instructor";
-    else if (roleHeading.includes("ta") || roleHeading.includes("teaching assistant")) role = "ta";
-    else if (roleHeading.includes("reader") || roleHeading.includes("grader")) role = "reader";
+    // Student dashboard doesn't show role headings — default to student
+    const role: CourseRole = "student";
 
     courses.push({
       id,
-      name: name || `Course ${id}`,
+      name,
       shortName,
       term,
       role,
-      instructorName,
-      enrollmentCount,
       url: `${GRADESCOPE_BASE_URL}/courses/${id}`,
     });
   });
 
-  // Fallback: try generic anchor-based extraction if courseBox pattern fails
+  // Fallback: generic anchor-based extraction if structured selectors fail
   if (courses.length === 0) {
     $("a[href*='/courses/']").each((_i, el) => {
       const href = $(el).attr("href") ?? "";
@@ -155,10 +132,9 @@ export function parseCourseHTML(html: string): GradescopeCourse[] {
       if (!idMatch) return;
 
       const id = idMatch[1];
-      // Skip duplicates
       if (courses.some((c) => c.id === id)) return;
 
-      const name = $(el).text().trim();
+      const name = $(el).attr("title")?.trim() || $(el).text().trim();
       if (!name) return;
 
       courses.push({

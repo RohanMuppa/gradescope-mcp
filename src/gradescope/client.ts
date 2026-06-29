@@ -242,30 +242,67 @@ export class GradescopeClient {
     try {
       const cookieHeader = this.buildCookieHeader(session);
 
-      // Build headers - add X-Requested-With for .json endpoints
-      const headers: Record<string, string> = {
-        Cookie: cookieHeader,
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/json",
-      };
-
-      // Rails/Gradescope .json endpoints require X-Requested-With to distinguish AJAX from direct navigation
-      if (path.endsWith(".json")) {
-        headers["X-Requested-With"] = "XMLHttpRequest";
-      }
-
       const response = await fetch(url, {
         method: "GET",
-        headers,
+        headers: {
+          Cookie: cookieHeader,
+          "User-Agent": USER_AGENT,
+          Accept: "text/html,application/json",
+        },
         redirect: "manual",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
-      // Detect redirect to login page
+      // Detect redirect to login page vs safe same-origin redirects
       if (response.status === 301 || response.status === 302) {
         const location = response.headers.get("location") ?? "";
         if (location.includes("/login")) {
           return { body: "", redirectedToLogin: true };
+        }
+
+        // Follow safe same-origin redirects (e.g., assignment → submission page)
+        if (location.startsWith("/") || location.includes("gradescope.com")) {
+          const redirectUrl = location.startsWith("/") ? `${BASE_URL}${location}` : location;
+          validateDomain(redirectUrl);
+          log("DEBUG", `Following redirect: ${url} → ${redirectUrl}`);
+
+          const redirectResponse = await fetch(redirectUrl, {
+            method: "GET",
+            headers: {
+              Cookie: cookieHeader,
+              "User-Agent": USER_AGENT,
+              Accept: "text/html,application/json",
+            },
+            redirect: "manual",
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          });
+
+          // Check if the redirect target itself redirects to login
+          if (redirectResponse.status === 301 || redirectResponse.status === 302) {
+            const redirectLoc = redirectResponse.headers.get("location") ?? "";
+            if (redirectLoc.includes("/login")) {
+              return { body: "", redirectedToLogin: true };
+            }
+          }
+
+          if (!redirectResponse.ok && redirectResponse.status !== 301 && redirectResponse.status !== 302) {
+            const safeMessage = redirectResponse.status === 403 || redirectResponse.status === 401
+              ? "Access denied"
+              : redirectResponse.status === 404
+              ? "Resource not found"
+              : redirectResponse.status >= 500
+              ? "Server error"
+              : "Network request failed";
+            throw new GradescopeError(
+              "NETWORK_ERROR",
+              `[GSMCP-1015] ${safeMessage}`,
+              { status: redirectResponse.status },
+              "Check if Gradescope is accessible and retry"
+            );
+          }
+
+          const body = await redirectResponse.text();
+          return { body, redirectedToLogin: false };
         }
       }
 

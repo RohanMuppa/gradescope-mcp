@@ -11,3 +11,4 @@ secrets.json
 *.tsbuildinfo
 coverage/
 FINGERPRINTS.md
+CLAUDE.md

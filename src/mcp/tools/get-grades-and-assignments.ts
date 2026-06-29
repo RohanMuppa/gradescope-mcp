@@ -17,8 +17,8 @@ import type { GradescopeClient } from "../../gradescope/client.js";
 import type { TTLCache } from "../../utils/cache.js";
 import type { GradescopeCourse, GradescopeAssignment, AssignmentType } from "../../gradescope/types.js";
 import { parseCourseJSON, parseCourseHTML } from "../../gradescope/parsers/courses.js";
-import { parseAssignmentJSON, parseAssignmentHTML } from "../../gradescope/parsers/assignments.js";
-import { parseGradeJSON, parseGradeHTML } from "../../gradescope/parsers/grades.js";
+import { parseAssignmentHTML } from "../../gradescope/parsers/assignments.js";
+import { parseGradeHTML } from "../../gradescope/parsers/grades.js";
 import { fuzzyMatchCourse } from "../../gradescope/fuzzy-match.js";
 import { validateName } from "../../security/input-validator.js";
 import { CACHE_TTLS } from "../../utils/config.js";
@@ -234,27 +234,19 @@ async function fetchAssignments(
     return cached as GradescopeAssignment[];
   }
 
-  const path = `/courses/${courseId}/assignments`;
-
-  // Try JSON first
-  try {
-    const json = await gsClient.getJSON(`${path}.json`, { forceRefresh: true });
-    const assignments = parseAssignmentJSON(json, courseId);
-    cache.set(cacheKey, assignments, CACHE_TTLS.assignments);
-    return assignments;
-  } catch (jsonError) {
-    log("DEBUG", `JSON assignment fetch failed for course ${courseId}, falling back to HTML`, jsonError);
-  }
-
-  // Fallback to HTML
-  const html = await gsClient.getText(path, { forceRefresh: true });
+  // Fetch course dashboard page — Gradescope renders assignments on /courses/{id}
+  // Note: /courses/{id}/assignments.json returns 401 for students (no such API)
+  // and /courses/{id}/assignments redirects to / (no such route)
+  const html = await gsClient.getText(`/courses/${courseId}`, { forceRefresh: true });
   const assignments = parseAssignmentHTML(html, courseId);
   cache.set(cacheKey, assignments, CACHE_TTLS.assignments);
   return assignments;
 }
 
 /**
- * Fetch grade using JSON-first strategy with HTML fallback.
+ * Fetch grade details from assignment submission page.
+ * Gradescope redirects /courses/{id}/assignments/{aid} → /courses/{id}/assignments/{aid}/submissions/{sid}
+ * The doFetch client follows this redirect automatically.
  */
 async function fetchGrade(
   gsClient: GradescopeClient,
@@ -269,20 +261,8 @@ async function fetchGrade(
     return cached;
   }
 
-  const path = `/courses/${courseId}/assignments/${assignmentId}`;
-
-  // Try JSON first
-  try {
-    const json = await gsClient.getJSON(`${path}.json`, { forceRefresh: true });
-    const grade = parseGradeJSON(json, courseId, assignmentId);
-    cache.set(cacheKey, grade, CACHE_TTLS.grades);
-    return grade;
-  } catch (jsonError) {
-    log("DEBUG", `JSON grade fetch failed for assignment ${assignmentId}, falling back to HTML`, jsonError);
-  }
-
-  // Fallback to HTML
-  const html = await gsClient.getText(path, { forceRefresh: true });
+  // Fetch assignment page — Gradescope will redirect to the submission page
+  const html = await gsClient.getText(`/courses/${courseId}/assignments/${assignmentId}`, { forceRefresh: true });
   const grade = parseGradeHTML(html, courseId, assignmentId);
   cache.set(cacheKey, grade, CACHE_TTLS.grades);
   return grade;

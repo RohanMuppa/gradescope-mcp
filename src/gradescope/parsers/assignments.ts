@@ -105,10 +105,18 @@ export function parseAssignmentJSON(data: unknown, courseId: string): Gradescope
 }
 
 /**
- * Parse assignment data from Gradescope HTML page.
- * Extracts from the assignments table on `/courses/{courseId}/assignments`.
+ * Parse assignment data from Gradescope course dashboard HTML.
+ * Extracts from `#assignments-student-table` on `/courses/{courseId}`.
  *
- * @param html - Raw HTML content
+ * Table structure (as of 2026):
+ *   <tr role="row">
+ *     <th class="table--primaryLink">  — contains <a> (graded) or <button data-assignment-id> (unsubmitted)
+ *     <td class="submissionStatus">    — score div or status text
+ *     <td>                             — due date with <time> elements
+ *     <td class="hidden-column">       — raw release date
+ *     <td class="hidden-column">       — raw due date
+ *
+ * @param html - Raw HTML content from course dashboard
  * @param courseId - Course ID for enrichment
  * @returns Array of assignments (empty if none found)
  */
@@ -116,84 +124,85 @@ export function parseAssignmentHTML(html: string, courseId: string): GradescopeA
   const $ = cheerio.load(html);
   const assignments: GradescopeAssignment[] = [];
 
-  // Gradescope uses a table or list for assignments
-  $("tr.assignmentTable--row, tr[data-assignment-id], .assignment-row").each((_i, el) => {
+  // Each assignment is a <tr role="row"> inside the student table tbody
+  $("#assignments-student-table tbody tr[role='row']").each((_i, el) => {
     const $el = $(el);
+
+    // Extract assignment ID and name from <a> (graded/submitted) or <button> (unsubmitted)
+    let id: string | undefined;
+    let name: string | undefined;
+
     const link = $el.find("a[href*='/assignments/']").first();
-    const href = link.attr("href") ?? "";
-    const idMatch = href.match(/\/assignments\/(\d+)/);
-
-    // Also check data attribute
-    const dataId = $el.attr("data-assignment-id");
-    const id = idMatch?.[1] ?? dataId;
-    if (!id) return;
-
-    const name = link.text().trim() ||
-      $el.find(".assignmentTable--name, .assignment-name, td:first-child").text().trim();
-    if (!name) return;
-
-    // Extract due date
-    const dueDateText = $el.find(".assignmentTable--dueDate, .submissionTimeChart--dueDate, td:nth-child(2)").text().trim();
-
-    // Extract submission date
-    let submissionDate: string | undefined;
-    const submissionEl = $el.find(".submissionTimeChart--submissionDate, .submission-date, .submitted-at").text().trim();
-    if (submissionEl) {
-      submissionDate = submissionEl;
-    }
-
-    // Extract assignment type from category/type column or name patterns
-    let assignmentType: AssignmentType = "unknown";
-    const typeText = $el.find(".assignment-type, .category").text().trim();
-    if (typeText) {
-      assignmentType = normalizeAssignmentType(typeText);
+    if (link.length) {
+      const href = link.attr("href") ?? "";
+      const idMatch = href.match(/\/assignments\/(\d+)/);
+      id = idMatch?.[1];
+      name = link.text().trim();
     } else {
-      // Try to infer from assignment name
-      assignmentType = normalizeAssignmentType(name);
+      // Unsubmitted assignments use a <button> with data-assignment-id
+      const btn = $el.find("button[data-assignment-id]").first();
+      if (btn.length) {
+        id = btn.attr("data-assignment-id");
+        name = btn.attr("data-assignment-title") || btn.text().trim();
+      }
     }
 
-    // Extract late status from badge/indicator
-    let lateStatus: LateStatus = "unknown";
-    const lateBadge = $el.find(".late-badge, .late-indicator, .status-late").text().trim();
-    if (lateBadge) {
-      lateStatus = normalizeLateStatus(lateBadge);
-    } else if ($el.find(".late, .overdue").length > 0) {
-      lateStatus = "late";
-    } else if ($el.find(".on-time, .submitted").length > 0) {
-      lateStatus = "on_time";
-    } else if ($el.find(".missing, .not-submitted").length > 0) {
-      lateStatus = "missing";
-    }
+    if (!id || !name) return;
 
-    // Extract status
-    const status = $el.find(".submissionStatus, .assignmentTable--status, td:nth-child(3)").text().trim() || undefined;
-
-    // Extract score
-    const scoreText = $el.find(".assignmentTable--score, .submissionStatus--score, td:nth-child(4)").text().trim();
+    // Extract score from submissionStatus--score div (e.g., "100.0 / 50.0")
     let score: number | undefined;
     let maxScore: number | undefined;
+    const scoreText = $el.find(".submissionStatus--score").text().trim();
     const scoreMatch = scoreText.match(/([\d.]+)\s*\/\s*([\d.]+)/);
     if (scoreMatch) {
       score = parseFloat(scoreMatch[1]);
       maxScore = parseFloat(scoreMatch[2]);
     }
 
+    // Extract status text (e.g., "Submitted", "No Submission")
+    const statusText = $el.find(".submissionStatus--text").text().trim() || undefined;
+
+    // Extract due date from <time class="submissionTimeChart--dueDate"> datetime attribute
+    const dueDateEl = $el.find("time.submissionTimeChart--dueDate").first();
+    const dueDate = dueDateEl.attr("datetime") || dueDateEl.text().trim() || undefined;
+
+    // Determine late status from status indicators
+    let lateStatus: LateStatus = "unknown";
+    if (statusText) {
+      const lower = statusText.toLowerCase();
+      if (lower.includes("no submission")) {
+        lateStatus = "missing";
+      } else if (lower.includes("submitted")) {
+        lateStatus = "on_time";
+      }
+    }
+    const lateStatusEl = $el.find(".submissionTimeChart--lateStatus").text().trim();
+    if (lateStatusEl.toLowerCase().includes("late")) {
+      lateStatus = "late";
+    }
+    // If has a score, consider it submitted
+    if (score !== undefined && lateStatus === "unknown") {
+      lateStatus = "on_time";
+    }
+
+    // Infer assignment type from name
+    const assignmentType = normalizeAssignmentType(name);
+
     assignments.push({
       id,
       courseId,
       name,
-      dueDate: dueDateText || undefined,
-      submissionDate,
+      dueDate,
       assignmentType,
       lateStatus,
-      status,
+      status: statusText ?? (score !== undefined ? "Graded" : undefined),
       score,
       maxScore,
       url: `${GRADESCOPE_BASE_URL}/courses/${courseId}/assignments/${id}`,
     });
   });
 
-  // Fallback: extract from any assignment links
+  // Fallback: extract from any assignment links if table parsing found nothing
   if (assignments.length === 0) {
     $("a[href*='/assignments/']").each((_i, el) => {
       const href = $(el).attr("href") ?? "";
